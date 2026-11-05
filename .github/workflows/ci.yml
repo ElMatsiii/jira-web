@@ -1,0 +1,31 @@
+name: CI - Jira Web Frontend
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test-and-coverage:
+    name: Unit Tests & Coverage Audit (>= 60%)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage threshold
+        run: npm test -- --coverage --coverageThreshold='{"global":{"statements":60,"branches":60,"functions":60,"lines":60}}'
+
+      - name: Build static web bundle
+        run: npm run build
