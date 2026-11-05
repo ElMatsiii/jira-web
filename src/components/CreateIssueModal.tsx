@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export interface CreateIssueModalProps {
   isOpen: boolean;
@@ -23,6 +23,17 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
   const [priority, setPriority] = useState('MEDIUM');
   const [storyPoints, setStoryPoints] = useState(3);
   const [submitting, setSubmitting] = useState(false);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -51,9 +62,17 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
     <div className="modal-overlay" role="dialog" aria-modal="true" data-testid="create-issue-modal">
       <div className="modal-content">
         <div className="modal-header">
-          <h2>Crear Nueva Incidencia</h2>
+          <div>
+            <h2>Crear Nueva Incidencia</h2>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+              Registrada en el Microservicio MS1 (Go + PostgreSQL) vía GraphQL BFF
+            </p>
+          </div>
           <button className="btn btn-secondary btn-sm" onClick={onClose} aria-label="Cerrar modal">
-            ✕
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
 
@@ -69,6 +88,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               data-testid="input-issue-title"
+              autoFocus
             />
           </div>
 
@@ -133,7 +153,23 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '20px' }}>
+          {/* Fibonacci Quick Chips */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '20px' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-subtle)', marginRight: '4px' }}>Fibonacci:</span>
+            {[1, 2, 3, 5, 8, 13].map((pts) => (
+              <button
+                key={pts}
+                type="button"
+                className={`btn btn-sm ${storyPoints === pts ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontSize: '0.7rem', padding: '2px 7px' }}
+                onClick={() => setStoryPoints(pts)}
+              >
+                {pts}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
             <button type="button" className="btn btn-secondary" onClick={onClose}>
               Cancelar
             </button>

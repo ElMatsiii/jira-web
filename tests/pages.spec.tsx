@@ -42,6 +42,30 @@ describe('Web Pages Suite', () => {
 
       fireEvent.click(screen.getByTestId('backlog-btn-ai'));
       expect(onOpenAi).toHaveBeenCalled();
+
+      // Quick filter pills
+      fireEvent.click(screen.getByText('Historias'));
+      expect(screen.getByText('JIRA-101')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('Todos'));
+      expect(screen.getByText('JIRA-103')).toBeInTheDocument();
+    });
+
+    it('should show empty state when search finds no results', () => {
+      render(
+        <BacklogPage
+          issues={INITIAL_ISSUES}
+          loading={false}
+          onOpenCreateModal={jest.fn()}
+          onOpenAiDrawer={jest.fn()}
+        />
+      );
+
+      fireEvent.change(screen.getByTestId('backlog-search-input'), {
+        target: { value: 'Inexistente 99999' },
+      });
+      expect(screen.getByText(/No hay incidencias que coincidan/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByText('Restablecer Filtros'));
+      expect(screen.getByText('JIRA-101')).toBeInTheDocument();
     });
 
     it('should show loading indicator when loading is true', () => {
@@ -82,6 +106,17 @@ describe('Web Pages Suite', () => {
       // JIRA-101 is in DONE, should show Listo
       expect(screen.getByText('✓ Listo')).toBeInTheDocument();
     });
+
+    it('should show loading indicator on Board when loading is true', () => {
+      render(
+        <BoardPage
+          issues={[]}
+          loading={true}
+          onUpdateStatus={jest.fn()}
+        />
+      );
+      expect(screen.getByText(/Cargando tarjetas del tablero/i)).toBeInTheDocument();
+    });
   });
 
   describe('AnalyticsPage', () => {
@@ -95,6 +130,11 @@ describe('Web Pages Suite', () => {
 
       expect(screen.getByTestId('chart-line-ideal')).toBeInTheDocument();
       expect(screen.getByTestId('chart-line-actual')).toBeInTheDocument();
+    });
+
+    it('should show loading indicator on Analytics when loading is true', () => {
+      render(<AnalyticsPage data={null} loading={true} />);
+      expect(screen.getByText(/Calculando métricas analíticas/i)).toBeInTheDocument();
     });
 
     it('should render fallback values when data is null', () => {

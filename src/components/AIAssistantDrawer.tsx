@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export interface AIAssistantDrawerProps {
   isOpen: boolean;
@@ -16,6 +16,17 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -35,28 +46,69 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
     }
   };
 
+  const handleQuickTemplate = (title: string, desc: string) => {
+    setEpicTitle(title);
+    setEpicDescription(desc);
+  };
+
   return (
     <aside className="drawer-overlay" role="complementary" aria-label="Asistente Scrum Master IA" data-testid="ai-drawer">
       <div className="drawer-header">
         <div>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>✨</span> Scrum Master IA (MCP)
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.98rem', color: 'var(--text-main)', fontWeight: 700 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v4" />
+              <path d="M12 18v4" />
+              <path d="M4.93 4.93l2.83 2.83" />
+              <path d="M16.24 16.24l2.83 2.83" />
+              <path d="M2 12h4" />
+              <path d="M18 12h4" />
+              <path d="M4.93 19.07l2.83-2.83" />
+              <path d="M16.24 7.76l2.83-2.83" />
+            </svg>
+            Scrum Master IA (MCP)
           </h3>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Google Gemini 2.0 Flash + MCP Server
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+            Google Gemini 2.0 Flash + Microservicio MCP (:3000)
           </p>
         </div>
         <button className="btn btn-secondary btn-sm" onClick={onClose} aria-label="Cerrar panel IA">
-          ✕
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
       </div>
 
       <div className="drawer-body">
         <div className="ai-bubble">
-          👋 ¡Hola! Soy tu <strong>Scrum Master IA</strong>. Puedo desglosar requerimientos y épicas complejas en historias de usuario estructuradas con criterios de aceptación en formato <em>Gherkin (Given/When/Then)</em> y estimación Fibonacci.
+          Asistente inteligente de ingeniería y gestión ágil. Ingrese una épica o especificación funcional para desglosarla automáticamente en historias de usuario con criterios de aceptación en formato <em>Gherkin (Given/When/Then)</em> y estimación de puntos de historia en escala Fibonacci.
         </div>
 
-        <form onSubmit={handleDecompose} style={{ marginTop: '16px' }}>
+        {/* Quick prompt templates */}
+        <div style={{ marginBottom: '14px' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-subtle)', marginBottom: '6px' }}>Sugerencias rápidas:</div>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              style={{ fontSize: '0.72rem' }}
+              onClick={() => handleQuickTemplate('Pagos Stripe & Suscripciones', 'Implementar webhook idempotente y retry backoff')}
+            >
+              Pagos Stripe
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              style={{ fontSize: '0.72rem' }}
+              onClick={() => handleQuickTemplate('Autenticación Biométrica WebAuthn', 'Flujo FIDO2 con enclave seguro en frontend web')}
+            >
+              WebAuthn / Passkeys
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleDecompose} style={{ marginTop: '8px' }}>
           <div className="form-group">
             <label className="form-label" htmlFor="ai-epic-title">Título de la Épica / Requerimiento *</label>
             <input
@@ -87,36 +139,61 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
           <button
             type="submit"
             className="btn btn-ai"
-            style={{ width: '100%' }}
+            style={{ width: '100%', padding: '9px 16px', background: '#2563eb', color: '#ffffff', borderColor: '#1d4ed8' }}
             disabled={loading || !epicTitle.trim()}
             data-testid="btn-ai-decompose-submit"
           >
-            {loading ? 'Consultando a Gemini 2.0 Flash...' : '⚡ Desglosar Épica con IA'}
+            {loading ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span className="pulse-dot" style={{ backgroundColor: '#ffffff', boxShadow: 'none' }}></span>
+                Consultando a Gemini 2.0 Flash...
+              </span>
+            ) : (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+                Desglosar Épica con IA
+              </span>
+            )}
           </button>
         </form>
 
         {error && (
-          <div style={{ marginTop: '16px', padding: '12px', background: '#ffebe6', color: '#bf2600', borderRadius: '6px', fontSize: '0.85rem' }}>
-            {error}
+          <div style={{ marginTop: '16px', padding: '12px 14px', background: 'rgba(244, 63, 94, 0.1)', color: '#fb7185', border: '1px solid rgba(251, 113, 133, 0.3)', borderRadius: 'var(--radius-sm)', fontSize: '0.825rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, marginBottom: '2px' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span>{error}</span>
+            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Verifique que el microservicio <code>jira-mcp-agent</code> (:3000) esté respondiendo o configure la clave GEMINI_API_KEY.
+            </p>
           </div>
         )}
 
         {result && (
-          <div style={{ marginTop: '20px' }} data-testid="ai-decompose-results">
-            <h4 style={{ fontSize: '0.95rem', marginBottom: '10px', color: 'var(--text-main)' }}>
-              Historias Generadas para "{result.epicTitle}":
-            </h4>
+          <div style={{ marginTop: '22px' }} data-testid="ai-decompose-results">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <h4 style={{ fontSize: '0.825rem', color: 'var(--text-main)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Historias Generadas: "{result.epicTitle}"
+              </h4>
+              <span className="badge badge-epic">ÉPICA</span>
+            </div>
             {result.stories && result.stories.map((story: any, idx: number) => (
-              <div key={idx} style={{ background: '#f4f5f7', borderRadius: '6px', padding: '12px', marginBottom: '10px', borderLeft: '3px solid #6554c0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <strong style={{ fontSize: '0.85rem' }}>{story.title}</strong>
+              <div key={idx} style={{ background: '#16161a', borderRadius: 'var(--radius-sm)', padding: '12px', marginBottom: '10px', border: '1px solid var(--border-color)', borderLeft: '3px solid var(--color-accent)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <strong style={{ fontSize: '0.85rem', color: 'var(--text-main)' }}>{story.title}</strong>
                   <span className="points-pill">{story.estimatedStoryPoints} SP</span>
                 </div>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '6px 0' }}>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '6px 0', lineHeight: 1.4 }}>
                   {story.description}
                 </p>
                 {story.acceptanceCriteriaGherkin && (
-                  <pre style={{ fontSize: '0.75rem', background: '#ffffff', padding: '8px', borderRadius: '4px', overflowX: 'auto', border: '1px solid var(--border)' }}>
+                  <pre style={{ fontSize: '0.72rem', background: '#0e0e12', color: '#a1a1aa', padding: '8px 10px', borderRadius: '4px', overflowX: 'auto', border: '1px solid var(--border-color)', fontFamily: 'var(--font-mono)' }}>
                     {story.acceptanceCriteriaGherkin}
                   </pre>
                 )}
@@ -127,7 +204,8 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
       </div>
 
       <div className="drawer-footer">
-        <small style={{ color: 'var(--text-muted)' }}>
+        <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className="pulse-dot"></span>
           Conectado a <code>jira-mcp-agent (:3000)</code> mediante el Gateway GraphQL de <code>jira-bff</code>.
         </small>
       </div>

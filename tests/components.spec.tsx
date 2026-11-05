@@ -85,12 +85,20 @@ describe('Web Components Suite', () => {
       });
     });
 
-    it('should close when cancel or close button is clicked', () => {
+    it('should close when cancel or close button is clicked or Escape pressed', () => {
       const onClose = jest.fn();
       render(<CreateIssueModal isOpen={true} onClose={onClose} onCreate={jest.fn()} />);
 
       fireEvent.click(screen.getByText('Cancelar'));
       expect(onClose).toHaveBeenCalledTimes(1);
+
+      // Fibonacci chip selection
+      fireEvent.click(screen.getByText('8'));
+      expect(screen.getByTestId('input-issue-points')).toHaveValue(8);
+
+      // Escape key event
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -100,6 +108,20 @@ describe('Web Components Suite', () => {
         <AIAssistantDrawer isOpen={false} onClose={jest.fn()} onDecomposeEpic={jest.fn()} />
       );
       expect(container.firstChild).toBeNull();
+    });
+
+    it('should populate inputs when clicking a quick suggestion template', () => {
+      const onClose = jest.fn();
+      render(
+        <AIAssistantDrawer isOpen={true} onClose={onClose} onDecomposeEpic={jest.fn()} />
+      );
+
+      fireEvent.click(screen.getByText('Pagos Stripe'));
+      expect(screen.getByTestId('input-ai-epic-title')).toHaveValue('Pagos Stripe & Suscripciones');
+
+      // Escape key event
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
     it('should handle epic decomposition and render generated stories', async () => {
