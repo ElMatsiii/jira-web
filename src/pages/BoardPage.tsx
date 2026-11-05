@@ -34,7 +34,7 @@ export const BoardPage: React.FC<BoardPageProps> = ({
         <div>
           <h1 className="page-title">
             <span>Tablero Scrum Activo</span>
-            <span className="kbd-shortcut">Sprint #1</span>
+            <span className="nav-badge-enterprise">Sprint #1</span>
           </h1>
           <p className="page-subtitle">
             Flujo ágil con sincronización bidireccional entre MS1 (Go), MS2 (NestJS) y eventos Kafka.

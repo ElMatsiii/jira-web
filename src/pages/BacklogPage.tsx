@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 
 export interface Issue {
   id: string;
@@ -26,21 +26,6 @@ export const BacklogPage: React.FC<BacklogPageProps> = ({
 }) => {
   const [filterType, setFilterType] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Focus search with '/' key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === '/' && document.activeElement !== searchInputRef.current) {
-        if (!['INPUT', 'TEXTAREA'].includes((document.activeElement as HTMLElement)?.tagName)) {
-          e.preventDefault();
-          searchInputRef.current?.focus();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   const filteredIssues = issues.filter((issue) => {
     const matchesType = filterType === 'ALL' || issue.type === filterType;
@@ -59,7 +44,7 @@ export const BacklogPage: React.FC<BacklogPageProps> = ({
         <div>
           <h1 className="page-title">
             <span>Backlog del Producto</span>
-            <span className="kbd-shortcut" title="Repositorio">MS1 / Go + PG</span>
+            <span className="nav-badge-enterprise">MS1 • Go</span>
           </h1>
           <p className="page-subtitle">
             Gestión centralizada de requerimientos alimentada por el Microservicio MS1 (Go + PostgreSQL) y sincronizada vía gRPC con el BFF.
@@ -71,7 +56,6 @@ export const BacklogPage: React.FC<BacklogPageProps> = ({
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
             </svg>
             Desglosar Épica con IA
-            <span className="kbd-shortcut">⌘J</span>
           </button>
           <button className="btn btn-primary" onClick={onOpenCreateModal} data-testid="backlog-btn-create">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -79,36 +63,21 @@ export const BacklogPage: React.FC<BacklogPageProps> = ({
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
             Nueva Incidencia
-            <span className="kbd-shortcut" style={{ background: 'rgba(255,255,255,0.2)', color: '#ffffff' }}>C</span>
           </button>
         </div>
       </div>
 
       {/* Filter toolbar */}
       <div className="filter-toolbar">
-        <div style={{ position: 'relative', width: '320px' }}>
-          <input
-            ref={searchInputRef}
-            type="text"
-            className="form-input"
-            style={{ paddingRight: '36px' }}
-            placeholder="Buscar por título o clave (ej. JIRA-101)..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            data-testid="backlog-search-input"
-          />
-          <span
-            style={{
-              position: 'absolute',
-              right: '8px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              pointerEvents: 'none',
-            }}
-          >
-            <span className="kbd-shortcut">/</span>
-          </span>
-        </div>
+        <input
+          type="text"
+          className="form-input"
+          style={{ maxWidth: '320px' }}
+          placeholder="Buscar por título o clave (ej. JIRA-101)..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          data-testid="backlog-search-input"
+        />
 
         <select
           className="form-select"

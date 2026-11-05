@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { Navbar } from './components/Navbar';
 import { CreateIssueModal } from './components/CreateIssueModal';
@@ -71,27 +71,6 @@ export const App: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
   const [localIssues, setLocalIssues] = useState<Issue[]>(INITIAL_ISSUES);
-
-  // Global dev-tool keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const activeTag = (document.activeElement as HTMLElement)?.tagName;
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag)) return;
-
-      if (e.key === 'c' || e.key === 'C') {
-        e.preventDefault();
-        setIsCreateModalOpen(true);
-      } else if (e.key === 'b' || e.key === 'B') {
-        setCurrentTab('backlog');
-      } else if (e.key === 'k' || e.key === 'K') {
-        setCurrentTab('board');
-      } else if (e.key === 'm' || e.key === 'M') {
-        setCurrentTab('analytics');
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   // GraphQL hooks with resilient fallbacks
   const { data: backlogData, loading: backlogLoading } = useQuery(GET_BACKLOG, {

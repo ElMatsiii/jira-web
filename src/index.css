@@ -320,20 +320,6 @@ body {
   border-radius: var(--radius-xs);
 }
 
-/* Keyboard Shortcut Component */
-.kbd-shortcut {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  font-weight: 600;
-  padding: 1px 5px;
-  background-color: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-xs);
-  color: var(--text-muted);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
-  margin-left: 6px;
-}
-
 /* Main Content Layout */
 .main-content {
   padding: 28px 32px;

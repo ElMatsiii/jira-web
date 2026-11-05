@@ -56,7 +56,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
         <div>
           <h1 className="page-title">
             <span>Métricas de Sprint & Burndown Chart</span>
-            <span className="kbd-shortcut">MS3 / .NET 8 + Mongo</span>
+            <span className="nav-badge-enterprise">MS3 • .NET 8</span>
           </h1>
           <p className="page-subtitle">
             Cálculos en tiempo real procesados por el Microservicio MS3 (.NET 8 + MongoDB) mediante eventos Kafka de Kafka Consumer Group.
