@@ -1,4 +1,4 @@
-# 💻 Frontend Web SPA (`jira-web`)
+# Frontend Web SPA (`jira-web`)
 
 [![React Version](https://img.shields.io/badge/React-18.2-61DAFB.svg?logo=react&logoColor=black)]()
 [![Vite](https://img.shields.io/badge/Vite-5.1-646CFF.svg?logo=vite&logoColor=white)]()
@@ -11,16 +11,16 @@ Frontend web de página única (**SPA**) para la plataforma **Jira AI**. Desarro
 
 ---
 
-## 🏛️ Vistas y Capacidades Principales
+## Vistas y Capacidades Principales
 
 ```mermaid
 flowchart TD
-    SPA["💻 jira-web\n(React 18 + Apollo Client)"]
+    SPA["jira-web\n(React 18 + Apollo Client)"]
     
-    SPA --> V1["📋 Backlog del Producto\nFiltros por tipo, búsqueda en vivo y badges SP"]
-    SPA --> V2["📊 Tablero Scrum Kanban\n4 columnas (TODO, IN PROGRESS, IN REVIEW, DONE)"]
-    SPA --> V3["📉 Analítica & Burndown SVG\nCurva ideal vs real con gradiente y telemetría"]
-    SPA --> V4["🤖 Scrum Master IA (Drawer)\nDesglose de épicas, Gherkin y escala Fibonacci"]
+    SPA --> V1["Backlog del Producto\nFiltros por tipo, búsqueda en vivo y badges SP"]
+    SPA --> V2["Tablero Scrum Kanban\n4 columnas (TODO, IN PROGRESS, IN REVIEW, DONE)"]
+    SPA --> V3["Analítica & Burndown SVG\nCurva ideal vs real con gradiente y telemetría"]
+    SPA --> V4["Scrum Master IA (Drawer)\nDesglose de épicas, Gherkin y escala Fibonacci"]
 ```
 
 ### Funcionalidades Destacadas
@@ -33,7 +33,7 @@ flowchart TD
 
 ---
 
-## 📂 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```text
 jira-web/
@@ -65,7 +65,7 @@ jira-web/
 
 ---
 
-## ⚙️ Variables de Entorno
+## Variables de Entorno
 
 | Variable | Descripción | Valor por Defecto |
 | :--- | :--- | :--- |
@@ -74,7 +74,7 @@ jira-web/
 
 ---
 
-## 🧪 Pruebas Automatizadas y Cobertura
+## Pruebas Automatizadas y Cobertura
 
 La suite de pruebas fue desarrollada con **Jest** y **React Testing Library**:
 
@@ -98,7 +98,7 @@ npm run build
 
 ---
 
-## 🐳 Despliegue con Docker
+## Despliegue con Docker
 
 El proyecto se empaqueta en una imagen liviana de **Nginx Alpine** que sirve los archivos estáticos pre-compilados:
 
@@ -114,6 +114,6 @@ La aplicación queda accesible de inmediato en [http://localhost:5173](http://lo
 
 ---
 
-## 📄 Licencia
+## Licencia
 
-MIT License © 2026 Jira AI Team.
+MIT License (c) 2026 Jira AI Team.
