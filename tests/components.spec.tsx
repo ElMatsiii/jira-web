@@ -80,6 +80,7 @@ describe('Web Components Suite', () => {
           type: 'BUG',
           priority: 'CRITICAL',
           storyPoints: 5,
+          acceptanceCriteria: '',
         });
         expect(onClose).toHaveBeenCalled();
       });

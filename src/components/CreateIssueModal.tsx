@@ -9,13 +9,19 @@ export interface CreateIssueModalProps {
     type: string;
     priority: string;
     storyPoints: number;
+    acceptanceCriteria: string;
   }) => Promise<void> | void;
+  onImprove?: (issue: { title: string; description: string; type: string }) => Promise<{
+    storyPoints: number;
+    acceptanceCriteriaGherkin: string;
+  }>;
 }
 
 export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
   isOpen,
   onClose,
   onCreate,
+  onImprove,
 }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -23,6 +29,9 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
   const [priority, setPriority] = useState('MEDIUM');
   const [storyPoints, setStoryPoints] = useState(3);
   const [submitting, setSubmitting] = useState(false);
+  const [improving, setImproving] = useState(false);
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState('');
+  const [error, setError] = useState('');
 
   // Close on Escape key
   useEffect(() => {
@@ -43,18 +52,38 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
 
     try {
       setSubmitting(true);
+      setError('');
       await onCreate({
         title,
         description,
         type,
         priority,
         storyPoints: Number(storyPoints) || 0,
+        acceptanceCriteria,
       });
       setTitle('');
       setDescription('');
+      setAcceptanceCriteria('');
       onClose();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'No se pudo crear la incidencia.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleImprove = async () => {
+    if (!onImprove || !title.trim()) return;
+    setImproving(true);
+    setError('');
+    try {
+      const suggestion = await onImprove({ title, description, type });
+      setStoryPoints(suggestion.storyPoints);
+      setAcceptanceCriteria(suggestion.acceptanceCriteriaGherkin);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'No se pudo generar la propuesta.');
+    } finally {
+      setImproving(false);
     }
   };
 
@@ -91,6 +120,25 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
               autoFocus
             />
           </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="issue-acceptance">Criterios de aceptación</label>
+            <textarea
+              id="issue-acceptance"
+              className="form-textarea"
+              rows={4}
+              placeholder="¿Cómo sabremos que esta historia está terminada?"
+              value={acceptanceCriteria}
+              onChange={(e) => setAcceptanceCriteria(e.target.value)}
+            />
+          </div>
+
+          {onImprove && (
+            <button type="button" className="btn btn-ai" onClick={() => void handleImprove()} disabled={improving || submitting || !title.trim()}>
+              {improving ? 'Preparando propuesta...' : 'Sugerir criterios y estimación con IA'}
+            </button>
+          )}
+          {error && <div className="form-error" role="alert">{error}</div>}
 
           <div className="form-group">
             <label className="form-label" htmlFor="issue-desc">Descripción</label>

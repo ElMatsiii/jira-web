@@ -5,6 +5,7 @@ export interface BoardPageProps {
   issues: Issue[];
   loading?: boolean;
   onUpdateStatus: (issueId: string, newStatus: string) => Promise<void> | void;
+  sprintName?: string;
 }
 
 const COLUMNS: { id: Issue['status']; title: string; color: string }[] = [
@@ -18,6 +19,7 @@ export const BoardPage: React.FC<BoardPageProps> = ({
   issues,
   loading,
   onUpdateStatus,
+  sprintName,
 }) => {
   const getNextStatus = (current: Issue['status']): Issue['status'] | null => {
     switch (current) {
@@ -34,10 +36,10 @@ export const BoardPage: React.FC<BoardPageProps> = ({
         <div>
           <h1 className="page-title">
             <span>Tablero Scrum Activo</span>
-            <span className="nav-badge-enterprise">Sprint #1</span>
+            <span className="nav-badge-enterprise">{sprintName || 'Sin sprint activo'}</span>
           </h1>
           <p className="page-subtitle">
-            Flujo ágil con sincronización bidireccional entre MS1 (Go), MS2 (NestJS) y eventos Kafka.
+            Trabajo del sprint activo; mueve cada historia a través del flujo del equipo.
           </p>
         </div>
       </div>

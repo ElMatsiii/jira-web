@@ -4,18 +4,28 @@ export interface AIAssistantDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onDecomposeEpic: (epicTitle: string, epicDescription: string) => Promise<any>;
+  onCreateStory?: (story: {
+    title: string;
+    description: string;
+    type: string;
+    estimatedStoryPoints: number;
+    acceptanceCriteriaGherkin: string;
+  }) => Promise<void>;
 }
 
 export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
   isOpen,
   onClose,
   onDecomposeEpic,
+  onCreateStory,
 }) => {
   const [epicTitle, setEpicTitle] = useState('');
   const [epicDescription, setEpicDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [creatingStory, setCreatingStory] = useState<number | null>(null);
+  const [createdStories, setCreatedStories] = useState<number[]>([]);
 
   // Close on Escape key
   useEffect(() => {
@@ -37,6 +47,7 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
     try {
       setLoading(true);
       setError(null);
+      setCreatedStories([]);
       const res = await onDecomposeEpic(epicTitle, epicDescription);
       setResult(res);
     } catch (err: any) {
@@ -66,10 +77,10 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
               <path d="M4.93 19.07l2.83-2.83" />
               <path d="M16.24 7.76l2.83-2.83" />
             </svg>
-            Scrum Master IA (MCP)
+            Herramientas de IA para el proyecto
           </h3>
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Google Gemini 2.0 Flash + Microservicio MCP (:3000)
+            Acciones asistidas; revisa las propuestas antes de incorporarlas al proyecto.
           </p>
         </div>
         <button className="btn btn-secondary btn-sm" onClick={onClose} aria-label="Cerrar panel IA">
@@ -81,8 +92,9 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
       </div>
 
       <div className="drawer-body">
-        <div className="ai-bubble">
-          Asistente inteligente de ingeniería y gestión ágil. Ingrese una épica o especificación funcional para desglosarla automáticamente en historias de usuario con criterios de aceptación en formato <em>Gherkin (Given/When/Then)</em> y estimación de puntos de historia en escala Fibonacci.
+        <div className="ai-action-intro">
+          <strong>Desglosar una épica</strong>
+          <p>Genera historias candidatas con criterios de aceptación y estimaciones para que el equipo las revise.</p>
         </div>
 
         {/* Quick prompt templates */}
@@ -146,14 +158,14 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
             {loading ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                 <span className="pulse-dot" style={{ backgroundColor: '#ffffff', boxShadow: 'none' }}></span>
-                Consultando a Gemini 2.0 Flash...
+                Preparando propuesta...
               </span>
             ) : (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                 </svg>
-                Desglosar Épica con IA
+                Generar historias para revisar
               </span>
             )}
           </button>
@@ -170,7 +182,7 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
               <span>{error}</span>
             </div>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Verifique que el microservicio <code>jira-mcp-agent</code> (:3000) esté respondiendo o configure la clave GEMINI_API_KEY.
+              Verifica que el agente de IA esté activo y que <code>GEMINI_API_KEY</code> esté configurada para usar Gemini.
             </p>
           </div>
         )}
@@ -197,6 +209,27 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
                     {story.acceptanceCriteriaGherkin}
                   </pre>
                 )}
+                {onCreateStory && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={creatingStory === idx || createdStories.includes(idx)}
+                    onClick={async () => {
+                      setError(null);
+                      setCreatingStory(idx);
+                      try {
+                        await onCreateStory(story);
+                        setCreatedStories((current) => [...current, idx]);
+                      } catch (requestError: any) {
+                        setError(requestError?.message || 'No se pudo crear esta historia.');
+                      } finally {
+                        setCreatingStory(null);
+                      }
+                    }}
+                  >
+                    {createdStories.includes(idx) ? 'Agregada al backlog' : creatingStory === idx ? 'Creando...' : 'Crear historia'}
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -206,7 +239,7 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
       <div className="drawer-footer">
         <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span className="pulse-dot"></span>
-          Conectado a <code>jira-mcp-agent (:3000)</code> mediante el Gateway GraphQL de <code>jira-bff</code>.
+          Las propuestas de IA no se guardan automáticamente; revísalas antes de aplicarlas.
         </small>
       </div>
     </aside>

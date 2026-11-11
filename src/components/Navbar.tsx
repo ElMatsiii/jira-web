@@ -1,11 +1,14 @@
 import React from 'react';
 
 export interface NavbarProps {
-  currentTab: 'backlog' | 'board' | 'analytics';
-  onSelectTab: (tab: 'backlog' | 'board' | 'analytics') => void;
+  currentTab: 'backlog' | 'board' | 'timeline' | 'analytics';
+  onSelectTab: (tab: 'backlog' | 'board' | 'timeline' | 'analytics') => void;
   onOpenCreateModal: () => void;
   onToggleAiDrawer: () => void;
   isAiDrawerOpen: boolean;
+  userName?: string;
+  onLogout?: () => void;
+  canCreateIssue?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -14,6 +17,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCreateModal,
   onToggleAiDrawer,
   isAiDrawerOpen,
+  userName,
+  onLogout,
+  canCreateIssue = true,
 }) => {
   return (
     <header className="navbar" role="banner">
@@ -57,6 +63,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           Tablero Scrum
         </button>
         <button
+          className={`nav-btn ${currentTab === 'timeline' ? 'active' : ''}`}
+          onClick={() => onSelectTab('timeline')}
+          data-testid="tab-timeline"
+        >
+          Cronograma
+        </button>
+        <button
           className={`nav-btn ${currentTab === 'analytics' ? 'active' : ''}`}
           onClick={() => onSelectTab('analytics')}
           data-testid="tab-analytics"
@@ -66,7 +79,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <line x1="12" y1="20" x2="12" y2="4" />
             <line x1="6" y1="20" x2="6" y2="14" />
           </svg>
-          Métricas & Burndown
+          Métricas
         </button>
       </nav>
 
@@ -86,11 +99,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
           </svg>
-          Scrum Master IA
+          Herramientas IA
         </button>
         <button
           className="btn btn-primary"
           onClick={onOpenCreateModal}
+          disabled={!canCreateIssue}
           data-testid="btn-create-issue"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -99,6 +113,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           </svg>
           Crear Incidencia
         </button>
+        {userName && <span className="nav-user-name">{userName}</span>}
+        {onLogout && <button className="btn btn-secondary btn-sm" onClick={onLogout}>Salir</button>}
       </div>
     </header>
   );

@@ -1,229 +1,359 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation } from '@apollo/client';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useApolloClient, useMutation, useQuery } from '@apollo/client';
+import { AuthPage } from './components/AuthPage';
 import { Navbar } from './components/Navbar';
 import { CreateIssueModal } from './components/CreateIssueModal';
 import { AIAssistantDrawer } from './components/AIAssistantDrawer';
 import { BacklogPage, Issue } from './pages/BacklogPage';
 import { BoardPage } from './pages/BoardPage';
-import { AnalyticsPage, BurndownData } from './pages/AnalyticsPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
+import { TimelinePage } from './pages/TimelinePage';
 import {
-  GET_BACKLOG,
-  CREATE_ISSUE,
-  UPDATE_ISSUE_STATUS,
+  ADD_WORKSPACE_MEMBER,
+  ASSIGN_ISSUES_TO_SPRINT,
   AI_DECOMPOSE_EPIC,
-  GET_BURNDOWN_ANALYTICS,
+  AI_IMPROVE_STORY,
+  COMPLETE_SPRINT,
+  CREATE_ISSUE,
+  CREATE_PROJECT,
+  CREATE_SPRINT,
+  GET_BACKLOG,
+  GET_ME,
+  GET_SPRINTS,
+  GET_WORKSPACE_PROJECTS,
+  START_SPRINT,
+  UPDATE_ISSUE_STATUS,
 } from './graphql/client';
 
-export const INITIAL_ISSUES: Issue[] = [
-  {
-    id: 'issue-1',
-    key: 'JIRA-101',
-    title: 'Autenticación con OAuth2 y JWT',
-    description: 'Implementar flujo de inicio de sesión seguro en el backend',
-    status: 'DONE',
-    priority: 'HIGH',
-    type: 'STORY',
-    storyPoints: 5,
-  },
-  {
-    id: 'issue-2',
-    key: 'JIRA-102',
-    title: 'Migración a PostgreSQL con índices optimizados',
-    description: 'Mejorar el tiempo de consulta en la tabla de incidencias',
-    status: 'IN_PROGRESS',
-    priority: 'MEDIUM',
-    type: 'TASK',
-    storyPoints: 3,
-  },
-  {
-    id: 'issue-3',
-    key: 'JIRA-103',
-    title: 'Fix: Timeout en el consumidor de Kafka',
-    description: 'Corregir el retraso en el procesamiento de eventos de métricas',
-    status: 'IN_REVIEW',
-    priority: 'CRITICAL',
-    type: 'BUG',
-    storyPoints: 2,
-  },
-  {
-    id: 'issue-4',
-    key: 'JIRA-104',
-    title: 'Épica: Motor de Estimación con Gemini 2.0 Flash',
-    description: 'Integrar el servidor MCP con el LLM en la nube',
-    status: 'TODO',
-    priority: 'HIGH',
-    type: 'EPIC',
-    storyPoints: 8,
-  },
-];
-
-export const INITIAL_BURNDOWN: BurndownData = {
-  sprintId: 'sprint-active-1',
-  velocity: 32,
-  idealBurndown: [40, 32, 24, 16, 8, 0],
-  actualBurndown: [40, 36, 28, 20, 12, 0],
-  blockedCount: 0,
-  healthStatus: 'ON_TRACK',
-};
+type Tab = 'backlog' | 'board' | 'timeline' | 'analytics';
+interface Workspace { id: string; name: string; role: string }
+interface Project { id: string; workspaceId: string; name: string; key: string; description: string }
+interface Sprint {
+  id: string;
+  name: string;
+  goal: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  totalStoryPoints: number;
+  completedStoryPoints: number;
+}
 
 export const App: React.FC = () => {
-  const [currentTab, setCurrentTab] = useState<'backlog' | 'board' | 'analytics'>('backlog');
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
-  const [localIssues, setLocalIssues] = useState<Issue[]>(INITIAL_ISSUES);
+  const client = useApolloClient();
+  const [token, setToken] = useState(() => window.localStorage.getItem('jira-ai-token'));
+  const [tab, setTab] = useState<Tab>('backlog');
+  const [workspaceId, setWorkspaceId] = useState('');
+  const [projectId, setProjectId] = useState('');
+  const [showProjectForm, setShowProjectForm] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [projectKey, setProjectKey] = useState('');
+  const [memberEmail, setMemberEmail] = useState('');
+  const [issueModalOpen, setIssueModalOpen] = useState(false);
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  // GraphQL hooks with resilient fallbacks
-  const { data: backlogData, loading: backlogLoading } = useQuery(GET_BACKLOG, {
-    variables: { projectId: 'a0000000-0000-0000-0000-000000000001' },
-    onError: () => {
-      // Fallback silently to local state when BFF is offline during development
-    },
+  const meQuery = useQuery(GET_ME, { skip: !token, fetchPolicy: 'cache-and-network' });
+  const workspaces: Workspace[] = meQuery.data?.myWorkspaces || [];
+  const activeWorkspace = workspaces.find((workspace) => workspace.id === workspaceId);
+  useEffect(() => {
+    if (!workspaceId && workspaces.length) setWorkspaceId(workspaces[0].id);
+    if (workspaceId && !workspaces.some((workspace) => workspace.id === workspaceId)) {
+      setWorkspaceId(workspaces[0]?.id || '');
+      setProjectId('');
+    }
+  }, [workspaceId, workspaces]);
+
+  const projectsQuery = useQuery(GET_WORKSPACE_PROJECTS, {
+    variables: { workspaceId },
+    skip: !token || !workspaceId,
+    fetchPolicy: 'cache-and-network',
+  });
+  const projects: Project[] = projectsQuery.data?.workspaceProjects || [];
+  useEffect(() => {
+    if (projectId && !projects.some((project) => project.id === projectId)) setProjectId('');
+  }, [projectId, projects]);
+  const project = projects.find((item) => item.id === projectId);
+
+  const issuesQuery = useQuery(GET_BACKLOG, {
+    variables: { projectId },
+    skip: !token || !projectId,
+    fetchPolicy: 'cache-and-network',
+  });
+  const sprintsQuery = useQuery(GET_SPRINTS, {
+    variables: { projectId },
+    skip: !token || !projectId,
+    fetchPolicy: 'cache-and-network',
+  });
+  const issues: Issue[] = issuesQuery.data?.listIssues || [];
+  const sprints: Sprint[] = sprintsQuery.data?.listSprints || [];
+  const activeSprint = useMemo(() => sprints.find((sprint) => sprint.status === 'ACTIVE'), [sprints]);
+  const sprintIssues = activeSprint ? issues.filter((issue) => issue.sprintId === activeSprint.id) : [];
+
+  const [createProject] = useMutation(CREATE_PROJECT);
+  const [addMember] = useMutation(ADD_WORKSPACE_MEMBER);
+  const [createIssue] = useMutation(CREATE_ISSUE);
+  const [updateIssueStatus] = useMutation(UPDATE_ISSUE_STATUS);
+  const [assignIssuesToSprint] = useMutation(ASSIGN_ISSUES_TO_SPRINT);
+  const [createSprint] = useMutation(CREATE_SPRINT);
+  const [startSprint] = useMutation(START_SPRINT);
+  const [completeSprint] = useMutation(COMPLETE_SPRINT);
+  const [decomposeEpic] = useMutation(AI_DECOMPOSE_EPIC);
+  const [improveStory] = useMutation(AI_IMPROVE_STORY);
+
+  const logout = async () => {
+    window.localStorage.removeItem('jira-ai-token');
+    setToken(null);
+    setWorkspaceId('');
+    setProjectId('');
+    await client.clearStore();
+  };
+
+  const runAction = async (action: () => Promise<unknown>) => {
+    setErrorMessage('');
+    try {
+      await action();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'La operación no pudo completarse.');
+      throw error;
+    }
+  };
+
+  if (!token) return <AuthPage onAuthenticated={setToken} />;
+  if (meQuery.error) {
+    return (
+      <main className="auth-page">
+        <div className="auth-card">
+          <h1>No se pudo validar la sesión</h1>
+          <p>{meQuery.error.message}. Inicia sesión nuevamente cuando el servidor esté disponible.</p>
+          <button className="btn btn-primary" onClick={logout}>Iniciar sesión</button>
+        </div>
+      </main>
+    );
+  }
+  if (meQuery.loading && !meQuery.data) {
+    return <main className="auth-page"><div className="auth-card">Cargando tu espacio de trabajo...</div></main>;
+  }
+
+  const handleCreateProject = () => runAction(async () => {
+    const response = await createProject({
+      variables: { input: { workspaceId, name: projectName, key: projectKey.toUpperCase(), description: '' } },
+    });
+    const created: Project = response.data.createProject;
+    await projectsQuery.refetch();
+    setProjectId(created.id);
+    setProjectName('');
+    setProjectKey('');
+    setShowProjectForm(false);
   });
 
-  const { data: analyticsData } = useQuery(GET_BURNDOWN_ANALYTICS, {
-    variables: { sprintId: 'b0000000-0000-0000-0000-000000000001' },
-    onError: () => {},
+  const handleAddMember = () => runAction(async () => {
+    await addMember({ variables: { input: { workspaceId, email: memberEmail } } });
+    setMemberEmail('');
   });
 
-  const [createIssueMutation] = useMutation(CREATE_ISSUE);
-  const [updateIssueStatusMutation] = useMutation(UPDATE_ISSUE_STATUS);
-  const [aiDecomposeEpicMutation] = useMutation(AI_DECOMPOSE_EPIC);
+  const handleCreateIssue = (newIssue: {
+    title: string; description: string; type: string; priority: string; storyPoints: number;
+    acceptanceCriteria: string;
+  }) => runAction(async () => {
+    const type = ({ STORY: 1, TASK: 2, BUG: 3, EPIC: 4 } as Record<string, number>)[newIssue.type];
+    const priority = ({ LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 } as Record<string, number>)[newIssue.priority];
+    await createIssue({
+      variables: {
+        input: { projectId, ...newIssue, type, priority },
+      },
+    });
+    await issuesQuery.refetch();
+  });
 
-  // Combine GraphQL data or fallback to local issues
-  const issues: Issue[] = backlogData?.listIssues?.length
-    ? backlogData.listIssues
-    : localIssues;
+  const handleUpdateStatus = (id: string, status: string) => runAction(async () => {
+    await updateIssueStatus({ variables: { input: { id, status } } });
+    await issuesQuery.refetch();
+  });
 
-  const burndown: BurndownData = analyticsData?.getBurndownAnalytics || INITIAL_BURNDOWN;
+  const handleAssignIssue = (id: string, sprintId: string) => runAction(async () => {
+    await assignIssuesToSprint({ variables: { input: { issueIds: [id], sprintId } } });
+    await issuesQuery.refetch();
+    await sprintsQuery.refetch();
+  });
 
-  const handleCreateIssue = async (newIssue: {
+  const handleCreateSprint = (input: { name: string; goal: string; startDate: string; endDate: string }) =>
+    runAction(async () => {
+      await createSprint({
+        variables: {
+          input: {
+            projectId,
+            name: input.name,
+            goal: input.goal,
+            startDate: new Date(`${input.startDate}T00:00:00`).toISOString(),
+            endDate: new Date(`${input.endDate}T23:59:59`).toISOString(),
+          },
+        },
+      });
+      await sprintsQuery.refetch();
+    });
+
+  const handleStartSprint = (id: string) => runAction(async () => {
+    await startSprint({ variables: { id } });
+    await sprintsQuery.refetch();
+  });
+
+  const handleCompleteSprint = (id: string) => runAction(async () => {
+    await completeSprint({ variables: { id } });
+    await sprintsQuery.refetch();
+  });
+
+  const handleDecomposeEpic = async (epicTitle: string, epicDescription: string) => {
+    const response = await decomposeEpic({
+      variables: {
+        input: { projectId, projectKey: project?.key, epicTitle, epicDescription },
+      },
+    });
+    return response.data?.aiDecomposeEpic;
+  };
+
+  const handleImproveStory = async (input: { title: string; description: string; type: string }) => {
+    const response = await improveStory({
+      variables: { input: { ...input, projectId } },
+    });
+    const suggestion = response.data?.aiImproveStory;
+    if (!suggestion) throw new Error('El agente no devolvió una propuesta para esta historia.');
+    return suggestion;
+  };
+
+  const handleCreateSuggestedStory = (story: {
     title: string;
     description: string;
     type: string;
-    priority: string;
-    storyPoints: number;
-  }) => {
-    try {
-      await createIssueMutation({
-        variables: {
-          input: {
-            projectId: 'a0000000-0000-0000-0000-000000000001',
-            ...newIssue,
-          },
+    estimatedStoryPoints: number;
+    acceptanceCriteriaGherkin: string;
+  }) => runAction(async () => {
+    const type = story.type === 'TASK' ? 2 : 1;
+    await createIssue({
+      variables: {
+        input: {
+          projectId,
+          title: story.title,
+          description: story.description,
+          type,
+          priority: 2,
+          storyPoints: story.estimatedStoryPoints,
+          acceptanceCriteria: story.acceptanceCriteriaGherkin,
         },
-      });
-    } catch {
-      // Fallback local update
-      const key = `JIRA-${100 + localIssues.length + 1}`;
-      const created: Issue = {
-        id: `issue-local-${Date.now()}`,
-        key,
-        title: newIssue.title,
-        description: newIssue.description,
-        type: newIssue.type as any,
-        priority: newIssue.priority as any,
-        storyPoints: newIssue.storyPoints,
-        status: 'TODO',
-      };
-      setLocalIssues((prev) => [created, ...prev]);
-    }
-  };
+      },
+    });
+    await issuesQuery.refetch();
+  });
 
-  const handleUpdateStatus = async (issueId: string, newStatus: string) => {
-    try {
-      await updateIssueStatusMutation({
-        variables: {
-          input: {
-            issueId,
-            status: newStatus,
-          },
-        },
-      });
-    } catch {
-      // Fallback local update
-      setLocalIssues((prev) =>
-        prev.map((i) => (i.id === issueId ? { ...i, status: newStatus as any } : i))
-      );
-    }
-  };
-
-  const handleDecomposeEpic = async (epicTitle: string, epicDescription: string) => {
-    try {
-      const res = await aiDecomposeEpicMutation({
-        variables: {
-          input: {
-            epicTitle,
-            epicDescription,
-          },
-        },
-      });
-      return res.data?.aiDecomposeEpic;
-    } catch {
-      // Fallback rule-based estimation if offline
-      return {
-        epicTitle,
-        stories: [
-          {
-            title: `Configurar arquitectura base para ${epicTitle}`,
-            description: `Definición de modelos de datos, endpoints e interfaces iniciales para ${epicTitle}.`,
-            type: 'STORY',
-            estimatedStoryPoints: 5,
-            acceptanceCriteriaGherkin: `Given el sistema inicializado\nWhen se invoca el módulo de ${epicTitle}\nThen responde dentro de SLA < 200ms`,
-          },
-          {
-            title: `Implementar validaciones y reglas de negocio de ${epicTitle}`,
-            description: `Manejo de errores, control de excepciones y auditoría de eventos.`,
-            type: 'STORY',
-            estimatedStoryPoints: 3,
-            acceptanceCriteriaGherkin: `Given datos incompletos\nWhen se envían al servicio\nThen retorna código 400 Bad Request con detalles`,
-          },
-        ],
-      };
-    }
-  };
+  const queryError = issuesQuery.error || sprintsQuery.error || projectsQuery.error;
 
   return (
     <div className="app-layout">
       <Navbar
-        currentTab={currentTab}
-        onSelectTab={setCurrentTab}
-        onOpenCreateModal={() => setIsCreateModalOpen(true)}
-        onToggleAiDrawer={() => setIsAiDrawerOpen(!isAiDrawerOpen)}
-        isAiDrawerOpen={isAiDrawerOpen}
+        currentTab={tab}
+        onSelectTab={setTab}
+        onOpenCreateModal={() => setIssueModalOpen(true)}
+        onToggleAiDrawer={() => setAiDrawerOpen((open) => !open)}
+        isAiDrawerOpen={aiDrawerOpen}
+        userName={meQuery.data?.me?.name}
+        onLogout={logout}
+        canCreateIssue={Boolean(projectId)}
       />
-
-      {currentTab === 'backlog' && (
-        <BacklogPage
-          issues={issues}
-          loading={backlogLoading && !localIssues.length}
-          onOpenCreateModal={() => setIsCreateModalOpen(true)}
-          onOpenAiDrawer={() => setIsAiDrawerOpen(true)}
-        />
+      <section className="project-toolbar">
+        <label>
+          <span>Espacio</span>
+          <select className="form-select" value={workspaceId} onChange={(event) => { setWorkspaceId(event.target.value); setProjectId(''); }}>
+            {workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name} · {workspace.role}</option>)}
+          </select>
+        </label>
+        <label>
+          <span>Proyecto</span>
+          <select className="form-select" value={projectId} onChange={(event) => setProjectId(event.target.value)} disabled={!projects.length}>
+            <option value="">Selecciona un proyecto</option>
+            {projects.map((item) => <option key={item.id} value={item.id}>{item.key} · {item.name}</option>)}
+          </select>
+        </label>
+        {['OWNER', 'ADMIN'].includes(activeWorkspace?.role || '') && (
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowProjectForm((shown) => !shown)} disabled={!workspaceId}>+ Proyecto</button>
+        )}
+        {['OWNER', 'ADMIN'].includes(activeWorkspace?.role || '') && (
+          <form className="member-form" onSubmit={(event) => { event.preventDefault(); void handleAddMember(); }}>
+            <input className="form-input" type="email" placeholder="Agregar miembro por email" value={memberEmail} onChange={(event) => setMemberEmail(event.target.value)} aria-label="Email del nuevo miembro" />
+            <button className="btn btn-secondary btn-sm" type="submit" disabled={!memberEmail.trim()}>Invitar</button>
+          </form>
+        )}
+      </section>
+      {showProjectForm && (
+        <form className="project-create-form" onSubmit={(event) => { event.preventDefault(); void handleCreateProject(); }}>
+          <input className="form-input" placeholder="Nombre del proyecto" required value={projectName} onChange={(event) => setProjectName(event.target.value)} />
+          <input className="form-input project-key-input" placeholder="CLAVE" required maxLength={10} value={projectKey} onChange={(event) => setProjectKey(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} />
+          <button className="btn btn-primary btn-sm" type="submit" disabled={!projectName.trim() || projectKey.length < 2}>Crear</button>
+        </form>
       )}
-
-      {currentTab === 'board' && (
-        <BoardPage
-          issues={issues}
-          loading={backlogLoading && !localIssues.length}
-          onUpdateStatus={handleUpdateStatus}
-        />
+      {(errorMessage || queryError) && (
+        <div className="app-error" role="alert">
+          {errorMessage || queryError?.message}
+          <button type="button" onClick={() => { setErrorMessage(''); void issuesQuery.refetch(); void sprintsQuery.refetch(); }}>Reintentar</button>
+        </div>
       )}
-
-      {currentTab === 'analytics' && (
-        <AnalyticsPage data={burndown} />
+      {!projectId ? (
+        <main className="main-content empty-project-state">
+          <h1>{projects.length ? 'Selecciona un proyecto' : 'Crea el primer proyecto de tu equipo'}</h1>
+          <p>Los proyectos, historias y actividad son compartidos con los miembros de este espacio de trabajo.</p>
+          {!projects.length && <button className="btn btn-primary" onClick={() => setShowProjectForm(true)}>Crear proyecto</button>}
+        </main>
+      ) : (
+        <>
+          {tab === 'backlog' && (
+            <BacklogPage
+              issues={issues}
+              sprints={sprints}
+              loading={issuesQuery.loading && !issuesQuery.data}
+              onOpenCreateModal={() => setIssueModalOpen(true)}
+              onOpenAiDrawer={() => setAiDrawerOpen(true)}
+              onAssignIssue={handleAssignIssue}
+            />
+          )}
+          {tab === 'board' && (
+            <BoardPage
+              issues={sprintIssues}
+              loading={issuesQuery.loading && !issuesQuery.data}
+              onUpdateStatus={handleUpdateStatus}
+              sprintName={activeSprint?.name}
+            />
+          )}
+          {tab === 'timeline' && (
+            <TimelinePage
+              sprints={sprints}
+              loading={sprintsQuery.loading && !sprintsQuery.data}
+              onCreateSprint={handleCreateSprint}
+              onStartSprint={handleStartSprint}
+              onCompleteSprint={handleCompleteSprint}
+            />
+          )}
+          {tab === 'analytics' && (
+            <AnalyticsPage
+              projectId={projectId}
+              sprint={activeSprint || null}
+              issues={issues}
+            />
+          )}
+        </>
       )}
-
       <CreateIssueModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
+        isOpen={issueModalOpen}
+        onClose={() => setIssueModalOpen(false)}
         onCreate={handleCreateIssue}
+        onImprove={handleImproveStory}
       />
-
-      <AIAssistantDrawer
-        isOpen={isAiDrawerOpen}
-        onClose={() => setIsAiDrawerOpen(false)}
-        onDecomposeEpic={handleDecomposeEpic}
-      />
+      {projectId && (
+        <AIAssistantDrawer
+          isOpen={aiDrawerOpen}
+          onClose={() => setAiDrawerOpen(false)}
+          onDecomposeEpic={handleDecomposeEpic}
+          onCreateStory={handleCreateSuggestedStory}
+        />
+      )}
     </div>
   );
 };

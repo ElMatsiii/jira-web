@@ -1,6 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useMutation, useQuery } from '@apollo/client';
+import { AI_DIAGNOSE_METRICS, GET_BURNDOWN_ANALYTICS, GET_PROJECT_WORK_LOGS, LOG_WORK } from '../graphql/client';
 
-export interface BurndownData {
+interface Sprint {
+  id: string;
+  name: string;
+  goal: string;
+}
+
+interface BurndownData {
   sprintId: string;
   velocity: number;
   idealBurndown: number[];
@@ -9,227 +17,166 @@ export interface BurndownData {
   healthStatus: string;
 }
 
-export interface AnalyticsPageProps {
-  data: BurndownData | null;
-  loading?: boolean;
+interface Diagnosis {
+  summary: string;
+  rootCauses: string[];
+  recommendations: string[];
+  healthStatus: string;
 }
 
-export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
-  data,
-  loading,
-}) => {
-  const ideal = data?.idealBurndown || [40, 32, 24, 16, 8, 0];
-  const actual = data?.actualBurndown || [40, 35, 29, 22, 14, 2];
-  const velocity = data?.velocity ?? 28;
-  const health = data?.healthStatus || 'ON_TRACK';
-  const blocked = data?.blockedCount ?? 0;
+interface AnalyticsPageProps {
+  projectId: string;
+  sprint: Sprint | null;
+  issues: { id: string; key: string; title: string }[];
+}
 
-  // SVG Chart calculation
-  const maxPoints = Math.max(...ideal, ...actual, 40);
+export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint, issues }) => {
+  const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
+  const [diagnosisError, setDiagnosisError] = useState('');
+  const [issueId, setIssueId] = useState('');
+  const [hours, setHours] = useState('1');
+  const [workNote, setWorkNote] = useState('');
+  const [workError, setWorkError] = useState('');
+  const workLogs = useQuery(GET_PROJECT_WORK_LOGS, {
+    variables: { projectId },
+    skip: !projectId,
+    fetchPolicy: 'cache-and-network',
+  });
+  const [recordWork, recordWorkState] = useMutation(LOG_WORK);
+  const { data, loading, error } = useQuery(GET_BURNDOWN_ANALYTICS, {
+    variables: { sprintId: sprint?.id || '' },
+    skip: !sprint,
+    fetchPolicy: 'cache-and-network',
+  });
+  const [diagnose, diagnoseState] = useMutation(AI_DIAGNOSE_METRICS);
+  const metrics: BurndownData | undefined = data?.getBurndownAnalytics;
+  const ideal = metrics?.idealBurndown || [];
+  const actual = metrics?.actualBurndown || [];
+  const values = [...ideal, ...actual];
+  const maxPoints = Math.max(...values, 1);
   const width = 560;
   const height = 240;
   const padding = 34;
+  const getPoints = (series: number[]) => series.map((value, index) => {
+    const x = padding + (index / Math.max(series.length - 1, 1)) * (width - 2 * padding);
+    const y = height - padding - (value / maxPoints) * (height - 2 * padding);
+    return `${x},${y}`;
+  }).join(' ');
 
-  const getPoints = (values: number[]) => {
-    return values.map((val, idx) => {
-      const x = padding + (idx / (values.length - 1)) * (width - 2 * padding);
-      const y = height - padding - (val / maxPoints) * (height - 2 * padding);
-      return `${x},${y}`;
-    }).join(' ');
+  const runDiagnosis = async () => {
+    setDiagnosisError('');
+    setDiagnosis(null);
+    try {
+      const result = await diagnose({
+        variables: {
+          input: { projectId, sprintId: sprint?.id, blockedIssuesCount: metrics?.blockedCount || 0 },
+        },
+      });
+      setDiagnosis(result.data?.aiDiagnoseMetrics || null);
+    } catch (requestError) {
+      setDiagnosisError(requestError instanceof Error ? requestError.message : 'No se pudo analizar el sprint.');
+    }
   };
 
-  const getAreaPath = (values: number[]) => {
-    const points = values.map((val, idx) => {
-      const x = padding + (idx / (values.length - 1)) * (width - 2 * padding);
-      const y = height - padding - (val / maxPoints) * (height - 2 * padding);
-      return `${x},${y}`;
-    });
-    const firstX = padding;
-    const lastX = width - padding;
-    const bottomY = height - padding;
-    return `M ${points[0]} L ${points.join(' L ')} L ${lastX},${bottomY} L ${firstX},${bottomY} Z`;
+  const submitWorkLog = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setWorkError('');
+    try {
+      await recordWork({
+        variables: { input: { projectId, issueId, hours: Number(hours), note: workNote } },
+      });
+      await workLogs.refetch();
+      setWorkNote('');
+    } catch (requestError) {
+      setWorkError(requestError instanceof Error ? requestError.message : 'No se pudo registrar el tiempo.');
+    }
   };
 
   return (
-    <div className="main-content" data-testid="page-analytics">
-      <div className="page-header">
+    <main className="main-content" data-testid="page-analytics">
+      <header className="page-header">
         <div>
-          <h1 className="page-title">
-            <span>Métricas de Sprint & Burndown Chart</span>
-            <span className="nav-badge-enterprise">MS3 • .NET 8</span>
-          </h1>
-          <p className="page-subtitle">
-            Cálculos en tiempo real procesados por el Microservicio MS3 (.NET 8 + MongoDB) mediante eventos Kafka de Kafka Consumer Group.
-          </p>
+          <h1 className="page-title">Rendimiento del proyecto</h1>
+          <p className="page-subtitle">Métricas reales del sprint seleccionado; la IA puede señalar riesgos y proponer acciones.</p>
         </div>
-      </div>
-
-      {loading ? (
-        <div style={{ padding: '24px' }}>
-          <div style={{ paddingBottom: '16px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            Calculando métricas analíticas...
-          </div>
-          <div className="analytics-grid">
-            <div className="chart-card">
-              <div className="skeleton-shimmer" style={{ width: '100%', height: '240px' }} />
-            </div>
-            <div>
-              {[1, 2, 3].map((n) => (
-                <div key={n} className="stat-box">
-                  <div className="skeleton-shimmer" style={{ width: '50%', height: '14px', marginBottom: '8px' }} />
-                  <div className="skeleton-shimmer" style={{ width: '80%', height: '32px' }} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        {sprint && (
+          <button className="btn btn-ai" onClick={() => void runDiagnosis()} disabled={diagnoseState.loading || loading}>
+            {diagnoseState.loading ? 'Analizando...' : 'Analizar sprint con IA'}
+          </button>
+        )}
+      </header>
+      {!sprint ? (
+        <section className="empty-state-box">Crea e inicia un sprint en Cronograma para ver métricas y análisis.</section>
+      ) : loading && !metrics ? (
+        <section className="empty-state-box">Cargando métricas del sprint {sprint.name}...</section>
+      ) : error ? (
+        <section className="app-error" role="alert">No se pudieron cargar las métricas: {error.message}</section>
+      ) : !metrics ? (
+        <section className="empty-state-box">Todavía no hay datos analíticos para este sprint.</section>
       ) : (
-        <div className="analytics-grid">
-          {/* Main Chart */}
-          <div className="chart-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>Curva de Burndown del Sprint</h3>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', fontFamily: 'var(--font-mono)' }}>Sprint 1 • 40 Story Points Comprometidos</span>
-              </div>
-              <div style={{ display: 'flex', gap: '14px', fontSize: '0.78rem' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)' }}>
-                  <span style={{ width: '12px', height: '2px', background: '#71717a', display: 'inline-block' }}></span>
-                  Ideal
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontWeight: 600 }}>
-                  <span style={{ width: '12px', height: '2px', background: '#3b82f6', display: 'inline-block' }}></span>
-                  Real
-                </span>
-              </div>
-            </div>
-
-            <svg
-              viewBox={`0 0 ${width} ${height}`}
-              style={{ width: '100%', height: 'auto', background: '#0e0e12', borderRadius: '6px', border: '1px solid var(--border-color)' }}
-              role="img"
-              aria-label="Gráfico de Burndown"
-            >
-              <defs>
-                <linearGradient id="burndownGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-
-              {/* Grid lines */}
-              <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#27272a" strokeWidth="1" />
-              <line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#27272a" strokeWidth="1" />
-              <line x1={padding} y1={(height - 2 * padding) / 2 + padding} x2={width - padding} y2={(height - 2 * padding) / 2 + padding} stroke="#1e1e24" strokeDasharray="3 3" />
-              <line x1={padding} y1={(height - 2 * padding) / 4 + padding} x2={width - padding} y2={(height - 2 * padding) / 4 + padding} stroke="#1e1e24" strokeDasharray="3 3" />
-
-              {/* Area gradient under actual curve */}
-              <path d={getAreaPath(actual)} fill="url(#burndownGrad)" />
-
-              {/* Ideal Line (dashed) */}
-              <polyline
-                fill="none"
-                stroke="#71717a"
-                strokeWidth="1.75"
-                strokeDasharray="4 4"
-                points={getPoints(ideal)}
-                data-testid="chart-line-ideal"
-              />
-
-              {/* Actual Line (solid blue) */}
-              <polyline
-                fill="none"
-                stroke="#3b82f6"
-                strokeWidth="2.25"
-                points={getPoints(actual)}
-                data-testid="chart-line-actual"
-              />
-
-              {/* Actual data points with micro rings */}
-              {actual.map((val, idx) => {
-                const x = padding + (idx / (actual.length - 1)) * (width - 2 * padding);
-                const y = height - padding - (val / maxPoints) * (height - 2 * padding);
-                return (
-                  <g key={idx}>
-                    <circle cx={x} cy={y} r="5" fill="#121215" stroke="#3b82f6" strokeWidth="2" />
-                    <circle cx={x} cy={y} r="2" fill="#60a5fa" />
-                  </g>
-                );
-              })}
-            </svg>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', fontSize: '0.75rem', color: 'var(--text-subtle)', fontFamily: 'var(--font-mono)' }}>
-              <span>Día 1 (Inicio)</span>
-              <span>Día 5 (Mitad de Sprint)</span>
-              <span>Día 10 (Cierre)</span>
-            </div>
+        <>
+          <div className="analytics-grid">
+            <section className="chart-card">
+              <h2 className="analytics-section-title">{sprint.name} · Burndown</h2>
+              <p className="page-subtitle">{sprint.goal || 'Sin objetivo definido'}</p>
+              {ideal.length > 1 && actual.length > 1 ? (
+                <svg viewBox={`0 0 ${width} ${height}`} className="burndown-chart" role="img" aria-label="Gráfico de burndown del sprint">
+                  <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#3f3f46" />
+                  <polyline fill="none" stroke="#71717a" strokeDasharray="4 4" strokeWidth="2" points={getPoints(ideal)} />
+                  <polyline fill="none" stroke="#3b82f6" strokeWidth="2.5" points={getPoints(actual)} />
+                </svg>
+              ) : <div className="empty-state-box">El burndown estará disponible cuando se registren cambios de trabajo durante el sprint.</div>}
+            </section>
+            <section className="analytics-kpis">
+              <div className="stat-box"><span>Velocidad promedio</span><strong>{metrics.velocity} SP / sprint</strong></div>
+              <div className="stat-box"><span>Historias bloqueadas</span><strong>{metrics.blockedCount}</strong></div>
+              <div className="stat-box"><span>Salud del sprint</span><strong>{metrics.healthStatus}</strong></div>
+            </section>
           </div>
-
-          {/* Side KPI cards */}
-          <div>
-            <div className="stat-box">
-              <span className="page-subtitle" style={{ textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.05em', fontWeight: 600 }}>Salud del Sprint</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-                <span
-                  style={{
-                    background: health === 'ON_TRACK' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)',
-                    color: health === 'ON_TRACK' ? '#34d399' : '#fb7185',
-                    border: `1px solid ${health === 'ON_TRACK' ? 'rgba(52, 211, 153, 0.3)' : 'rgba(251, 113, 133, 0.3)'}`,
-                    padding: '4px 10px',
-                    borderRadius: 'var(--radius-xs)',
-                    fontWeight: 700,
-                    fontSize: '0.78rem',
-                    letterSpacing: '0.04em',
-                    fontFamily: 'var(--font-mono)',
-                  }}
-                  data-testid="kpi-health-status"
-                >
-                  {health === 'ON_TRACK' ? '✓ EN TIEMPO (ON TRACK)' : 'EN RIESGO (AT RISK)'}
-                </span>
-              </div>
-            </div>
-
-            <div className="stat-box">
-              <span className="page-subtitle" style={{ textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.05em', fontWeight: 600 }}>Velocidad Promedio</span>
-              <div className="stat-value" data-testid="kpi-velocity">
-                {velocity} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)' }}>SP / sprint</span>
-              </div>
-            </div>
-
-            <div className="stat-box">
-              <span className="page-subtitle" style={{ textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.05em', fontWeight: 600 }}>Bloqueos Detectados</span>
-              <div className="stat-value" style={{ color: blocked > 0 ? 'var(--priority-critical)' : 'var(--priority-low)' }} data-testid="kpi-blocked">
-                {blocked} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)' }}>issues bloqueados</span>
-              </div>
-            </div>
-
-            {/* Microservices Topology Telemetry */}
-            <div style={{ background: '#121215', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '14px' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.04em' }}>
-                Pipeline de Microservicios Activo
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-body)' }}>
-                  <span>MS1 Issues (Go)</span>
-                  <span style={{ color: '#34d399' }}>● gRPC :50051</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-body)' }}>
-                  <span>MS2 Sprints (NestJS)</span>
-                  <span style={{ color: '#34d399' }}>● gRPC :50052</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-body)' }}>
-                  <span>MS3 Analytics (.NET 8)</span>
-                  <span style={{ color: '#34d399' }}>● Kafka Consumer</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-body)' }}>
-                  <span>AI Agent (Gemini 2.0)</span>
-                  <span style={{ color: '#38bdf8' }}>● MCP :3000</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+          {diagnosisError && <div className="app-error" role="alert">{diagnosisError}</div>}
+          {diagnosis && (
+            <section className="ai-diagnosis-card" aria-live="polite">
+              <h2>Recomendaciones para {sprint.name}</h2>
+              <p>{diagnosis.summary}</p>
+              {!!diagnosis.rootCauses.length && <h3>Factores detectados</h3>}
+              <ul>{diagnosis.rootCauses.map((item) => <li key={item}>{item}</li>)}</ul>
+              {!!diagnosis.recommendations.length && <h3>Acciones sugeridas</h3>}
+              <ul>{diagnosis.recommendations.map((item) => <li key={item}>{item}</li>)}</ul>
+            </section>
+          )}
+        </>
       )}
-    </div>
+      <section className="work-log-section">
+        <div className="work-log-heading">
+          <div>
+            <h2>Tiempo registrado</h2>
+            <p>Registra horas reales por historia para que el equipo pueda revisar dónde se invierte el esfuerzo.</p>
+          </div>
+          <strong>{Number(workLogs.data?.projectWorkLogs?.totalHours || 0).toFixed(2)} h</strong>
+        </div>
+        <form className="work-log-form" onSubmit={(event) => void submitWorkLog(event)}>
+          <select className="form-select" required value={issueId} onChange={(event) => setIssueId(event.target.value)} aria-label="Historia para registrar tiempo">
+            <option value="">Selecciona una historia</option>
+            {issues.map((issue) => <option key={issue.id} value={issue.id}>{issue.key} · {issue.title}</option>)}
+          </select>
+          <input className="form-input" type="number" min="0.01" max="24" step="0.25" required value={hours} onChange={(event) => setHours(event.target.value)} aria-label="Horas trabajadas" />
+          <input className="form-input" maxLength={500} placeholder="¿En qué se trabajó? (opcional)" value={workNote} onChange={(event) => setWorkNote(event.target.value)} aria-label="Nota del registro de tiempo" />
+          <button className="btn btn-primary" type="submit" disabled={!issueId || recordWorkState.loading}>{recordWorkState.loading ? 'Guardando...' : 'Registrar tiempo'}</button>
+        </form>
+        {workError && <p className="form-error" role="alert">{workError}</p>}
+        {workLogs.error && <p className="form-error" role="alert">No se pudo cargar el tiempo registrado: {workLogs.error.message}</p>}
+        {!!workLogs.data?.projectWorkLogs?.entries?.length && (
+          <div className="work-log-list">
+            {workLogs.data.projectWorkLogs.entries.map((entry: { id: string; issueKey: string; issueTitle: string; userName: string; hours: number; note: string; loggedAt: string }) => (
+              <article key={entry.id}>
+                <div><strong>{entry.issueKey}</strong> · {entry.issueTitle}<small>{entry.userName} · {new Date(entry.loggedAt).toLocaleString()}</small></div>
+                <span>{entry.hours} h</span>
+                {entry.note && <p>{entry.note}</p>}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </main>
   );
 };

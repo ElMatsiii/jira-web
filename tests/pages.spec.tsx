@@ -3,7 +3,30 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { BacklogPage } from '../src/pages/BacklogPage';
 import { BoardPage } from '../src/pages/BoardPage';
 import { AnalyticsPage } from '../src/pages/AnalyticsPage';
-import { INITIAL_ISSUES, INITIAL_BURNDOWN } from '../src/App';
+import { Issue } from '../src/pages/BacklogPage';
+
+jest.mock('@apollo/client', () => {
+  const actual = jest.requireActual('@apollo/client');
+  return {
+    ...actual,
+    useQuery: jest.fn().mockReturnValue({
+      data: { getBurndownAnalytics: {
+        sprintId: 'sprint-1', velocity: 32, idealBurndown: [40, 32, 24, 16, 8, 0],
+        actualBurndown: [40, 36, 28, 20, 12, 0], blockedCount: 0, healthStatus: 'ON_TRACK',
+      } },
+      loading: false,
+      error: undefined,
+    }),
+    useMutation: jest.fn().mockReturnValue([jest.fn(), { loading: false }]),
+  };
+});
+
+const INITIAL_ISSUES: Issue[] = [
+  { id: 'issue-1', key: 'JIRA-101', title: 'Autenticación con OAuth2 y JWT', status: 'DONE', priority: 'HIGH', type: 'STORY', storyPoints: 5 },
+  { id: 'issue-2', key: 'JIRA-102', title: 'Migración a PostgreSQL con índices optimizados', status: 'IN_PROGRESS', priority: 'MEDIUM', type: 'TASK', storyPoints: 3 },
+  { id: 'issue-3', key: 'JIRA-103', title: 'Fix: Timeout en el consumidor de Kafka', status: 'IN_REVIEW', priority: 'CRITICAL', type: 'BUG', storyPoints: 2 },
+  { id: 'issue-4', key: 'JIRA-104', title: 'Épica: Motor de Estimación con Gemini 2.0 Flash', status: 'TODO', priority: 'HIGH', type: 'EPIC', storyPoints: 8 },
+];
 
 describe('Web Pages Suite', () => {
   describe('BacklogPage', () => {
@@ -120,26 +143,18 @@ describe('Web Pages Suite', () => {
   });
 
   describe('AnalyticsPage', () => {
-    it('should render Burndown Chart SVG, KPI stats, and health badge', () => {
-      render(<AnalyticsPage data={INITIAL_BURNDOWN} loading={false} />);
+    it('should render live sprint metrics without fabricated fallback values', () => {
+      render(<AnalyticsPage projectId="project-1" sprint={{ id: 'sprint-1', name: 'Sprint 1', goal: 'Deliver MVP' }} issues={[]} />);
 
-      expect(screen.getByText('Métricas de Sprint & Burndown Chart')).toBeInTheDocument();
-      expect(screen.getByTestId('kpi-health-status')).toHaveTextContent('✓ EN TIEMPO (ON TRACK)');
-      expect(screen.getByTestId('kpi-velocity')).toHaveTextContent('32');
-      expect(screen.getByTestId('kpi-blocked')).toHaveTextContent('0');
-
-      expect(screen.getByTestId('chart-line-ideal')).toBeInTheDocument();
-      expect(screen.getByTestId('chart-line-actual')).toBeInTheDocument();
+      expect(screen.getByText('Rendimiento del proyecto')).toBeInTheDocument();
+      expect(screen.getByText('32 SP / sprint')).toBeInTheDocument();
+      expect(screen.getByText('0')).toBeInTheDocument();
+      expect(screen.getByLabelText('Gráfico de burndown del sprint')).toBeInTheDocument();
     });
 
-    it('should show loading indicator on Analytics when loading is true', () => {
-      render(<AnalyticsPage data={null} loading={true} />);
-      expect(screen.getByText(/Calculando métricas analíticas/i)).toBeInTheDocument();
-    });
-
-    it('should render fallback values when data is null', () => {
-      render(<AnalyticsPage data={null} loading={false} />);
-      expect(screen.getByText('Métricas de Sprint & Burndown Chart')).toBeInTheDocument();
+    it('should prompt to create an active sprint rather than show demo metrics', () => {
+      render(<AnalyticsPage projectId="project-1" sprint={null} issues={[]} />);
+      expect(screen.getByText(/Crea e inicia un sprint/i)).toBeInTheDocument();
     });
   });
 });

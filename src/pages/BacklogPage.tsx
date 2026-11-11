@@ -9,20 +9,26 @@ export interface Issue {
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   type: 'STORY' | 'TASK' | 'BUG' | 'EPIC';
   storyPoints: number;
+  sprintId?: string;
+  acceptanceCriteria?: string;
 }
 
 export interface BacklogPageProps {
   issues: Issue[];
+  sprints?: { id: string; name: string; status: string }[];
   loading?: boolean;
   onOpenCreateModal: () => void;
   onOpenAiDrawer: () => void;
+  onAssignIssue?: (issueId: string, sprintId: string) => void;
 }
 
 export const BacklogPage: React.FC<BacklogPageProps> = ({
   issues,
+  sprints = [],
   loading,
   onOpenCreateModal,
   onOpenAiDrawer,
+  onAssignIssue,
 }) => {
   const [filterType, setFilterType] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -191,6 +197,21 @@ export const BacklogPage: React.FC<BacklogPageProps> = ({
                 <span className="status-badge" style={{ minWidth: '95px', textAlign: 'center' }}>
                   {issue.status}
                 </span>
+                {onAssignIssue && sprints.length > 0 && (
+                  <select
+                    className="form-select issue-sprint-select"
+                    aria-label={`Sprint de ${issue.key}`}
+                    value={issue.sprintId || ''}
+                    onChange={(event) => {
+                      if (event.target.value) onAssignIssue(issue.id, event.target.value);
+                    }}
+                  >
+                    <option value="">Backlog</option>
+                    {sprints.filter((sprint) => sprint.status === 'PLANNED' || sprint.status === 'ACTIVE').map((sprint) => (
+                      <option key={sprint.id} value={sprint.id}>{sprint.name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
           ))
