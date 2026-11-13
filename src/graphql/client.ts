@@ -230,6 +230,22 @@ export const AI_PLAN_SPRINT = gql`
   }
 `;
 
+export const AI_BREAKDOWN_TASK = gql`
+  mutation AiBreakdownTask($input: BreakdownTaskInput!) {
+    aiBreakdownTask(input: $input) {
+      parentTitle
+      subtasks {
+        title
+        description
+        type
+        priority
+        estimatedStoryPoints
+        acceptanceCriteriaGherkin
+      }
+    }
+  }
+`;
+
 export function createApolloClient(customUri?: string) {
   const uri = customUri || (typeof window !== 'undefined' && (window as any).__GRAPHQL_URL__) || 'http://localhost:4000/graphql';
   const fetchFn = (typeof window !== 'undefined' && window.fetch) || (typeof global !== 'undefined' && (global as any).fetch) || (globalThis as any).fetch || (() => Promise.resolve(new Response()));

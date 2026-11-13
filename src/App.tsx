@@ -13,6 +13,7 @@ import {
   ASSIGN_ISSUES_TO_SPRINT,
   AI_DECOMPOSE_EPIC,
   AI_IMPROVE_STORY,
+  AI_BREAKDOWN_TASK,
   COMPLETE_SPRINT,
   CREATE_ISSUE,
   CREATE_PROJECT,
@@ -100,6 +101,7 @@ export const App: React.FC = () => {
   const [completeSprint] = useMutation(COMPLETE_SPRINT);
   const [decomposeEpic] = useMutation(AI_DECOMPOSE_EPIC);
   const [improveStory] = useMutation(AI_IMPROVE_STORY);
+  const [breakdownTask] = useMutation(AI_BREAKDOWN_TASK);
 
   const logout = async () => {
     window.localStorage.removeItem('jira-ai-token');
@@ -219,6 +221,15 @@ export const App: React.FC = () => {
     const suggestion = response.data?.aiImproveStory;
     if (!suggestion) throw new Error('El agente no devolvió una propuesta para esta historia.');
     return suggestion;
+  };
+
+  const handleBreakdownTask = async (input: { title: string; description?: string }) => {
+    const response = await breakdownTask({
+      variables: { input: { ...input, projectId } },
+    });
+    const result = response.data?.aiBreakdownTask;
+    if (!result) throw new Error('El agente no devolvió subtareas para esta incidencia.');
+    return result;
   };
 
   const handleCreateSuggestedStory = (story: {
@@ -350,6 +361,7 @@ export const App: React.FC = () => {
         onClose={() => setIssueModalOpen(false)}
         onCreate={handleCreateIssue}
         onImprove={handleImproveStory}
+        onBreakdownTask={projectId ? handleBreakdownTask : undefined}
       />
       {projectId && (
         <AIAssistantDrawer

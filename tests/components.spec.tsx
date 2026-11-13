@@ -101,6 +101,76 @@ describe('Web Components Suite', () => {
       fireEvent.keyDown(window, { key: 'Escape' });
       expect(onClose).toHaveBeenCalledTimes(2);
     });
+
+    it('should allow AI segmentation and opening a second customizable recuadro up to maximum 6', async () => {
+      const onBreakdownTask = jest.fn().mockResolvedValue({
+        parentTitle: 'crear la base de la pagina web',
+        subtasks: [
+          {
+            title: 'Crear frontend base',
+            description: 'Vistas React y temas',
+            type: 'TASK',
+            priority: 'HIGH',
+            estimatedStoryPoints: 3,
+            acceptanceCriteriaGherkin: 'Given front When loads Then ok',
+          },
+          {
+            title: 'Crear backend API',
+            description: 'Servicios Go y endpoints',
+            type: 'TASK',
+            priority: 'HIGH',
+            estimatedStoryPoints: 5,
+            acceptanceCriteriaGherkin: 'Given back When ping Then 200',
+          },
+        ],
+      });
+
+      render(
+        <CreateIssueModal
+          isOpen={true}
+          onClose={jest.fn()}
+          onCreate={jest.fn()}
+          onBreakdownTask={onBreakdownTask}
+        />
+      );
+
+      // Fill primary task title
+      fireEvent.change(screen.getByTestId('input-issue-title'), {
+        target: { value: 'crear la base de la pagina web' },
+      });
+
+      // Click "Segmentar en subtareas con IA"
+      fireEvent.click(screen.getByText('Segmentar en subtareas con IA'));
+
+      await waitFor(() => {
+        expect(onBreakdownTask).toHaveBeenCalledWith({
+          title: 'crear la base de la pagina web',
+          description: '',
+        });
+        expect(screen.getByText('Crear frontend base')).toBeInTheDocument();
+        expect(screen.getByText('Crear backend API')).toBeInTheDocument();
+      });
+
+      // Accept first subtask -> opens second recuadro!
+      const openButtons = screen.getAllByText('+ Abrir recuadro');
+      fireEvent.click(openButtons[0]);
+
+      // Now we should have 2 recuadros active in the deck
+      expect(screen.getByText('2 / 6 recuadros')).toBeInTheDocument();
+      // The active title in the form is now the accepted subtask
+      expect(screen.getByTestId('input-issue-title')).toHaveValue('Crear frontend base');
+      expect(screen.getByTestId('input-issue-points')).toHaveValue(3);
+
+      // Add blank drafts until reaching max 6
+      for (let i = 2; i < 6; i++) {
+        const addBtn = screen.getByText(new RegExp(`\\+ Nuevo recuadro \\(${i}/6\\)`));
+        fireEvent.click(addBtn);
+      }
+      expect(screen.getByText('6 / 6 recuadros')).toBeInTheDocument();
+
+      // Attempting to add beyond 6 is blocked
+      expect(screen.queryByText(/\+ Nuevo recuadro/)).not.toBeInTheDocument();
+    });
   });
 
   describe('AIAssistantDrawer Component', () => {

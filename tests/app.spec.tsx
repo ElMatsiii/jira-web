@@ -58,6 +58,7 @@ describe('App', () => {
         CompleteSprint: { completeSprint: { id: 'sprint-1', status: 'COMPLETED' } },
         AiDecomposeEpic: { aiDecomposeEpic: { epicTitle: 'Épica', stories: [] } },
         AiImproveStory: { aiImproveStory: { storyPoints: 3, acceptanceCriteriaGherkin: 'Given... Then...' } },
+        AiBreakdownTask: { aiBreakdownTask: { parentTitle: 'Tarea', subtasks: [] } },
         AddWorkspaceMember: { addWorkspaceMember: { id: 'user-2', email: 'member@example.com' } },
       };
       return [jest.fn().mockResolvedValue({ data: resultByName[name] }), { loading: false, error: undefined }];
