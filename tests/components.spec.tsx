@@ -151,22 +151,22 @@ describe('Web Components Suite', () => {
         expect(screen.getByText('Crear backend API')).toBeInTheDocument();
       });
 
-      // Accept first subtask -> opens second recuadro!
+      // Accept first subtask -> opens second recuadro in simultaneous grid!
       const openButtons = screen.getAllByText('+ Abrir recuadro');
       fireEvent.click(openButtons[0]);
 
-      // Now we should have 2 recuadros active in the deck
-      expect(screen.getByText('2 / 6 recuadros')).toBeInTheDocument();
-      // The active title in the form is now the accepted subtask
-      expect(screen.getByTestId('input-issue-title')).toHaveValue('Crear frontend base');
-      expect(screen.getByTestId('input-issue-points')).toHaveValue(3);
+      // Now we should have 2 recuadros active simultaneously in the grid
+      expect(screen.getByText(/2 \/ 6 recuadros/)).toBeInTheDocument();
+      // Both the original card and the new accepted card are simultaneously visible in the grid
+      expect(screen.getByDisplayValue('crear la base de la pagina web')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Crear frontend base')).toBeInTheDocument();
 
       // Add blank drafts until reaching max 6
       for (let i = 2; i < 6; i++) {
         const addBtn = screen.getByText(new RegExp(`\\+ Nuevo recuadro \\(${i}/6\\)`));
         fireEvent.click(addBtn);
       }
-      expect(screen.getByText('6 / 6 recuadros')).toBeInTheDocument();
+      expect(screen.getByText(/6 \/ 6 recuadros/)).toBeInTheDocument();
 
       // Attempting to add beyond 6 is blocked
       expect(screen.queryByText(/\+ Nuevo recuadro/)).not.toBeInTheDocument();
