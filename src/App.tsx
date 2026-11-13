@@ -258,88 +258,93 @@ export const App: React.FC = () => {
         userName={meQuery.data?.me?.name}
         onLogout={logout}
         canCreateIssue={Boolean(projectId)}
+        projectName={project?.name}
+        projectKey={project?.key}
+        workspaceName={activeWorkspace?.name}
       />
-      <section className="project-toolbar">
-        <label>
-          <span>Espacio</span>
-          <select className="form-select" value={workspaceId} onChange={(event) => { setWorkspaceId(event.target.value); setProjectId(''); }}>
-            {workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name} · {workspace.role}</option>)}
-          </select>
-        </label>
-        <label>
-          <span>Proyecto</span>
-          <select className="form-select" value={projectId} onChange={(event) => setProjectId(event.target.value)} disabled={!projects.length}>
-            <option value="">Selecciona un proyecto</option>
-            {projects.map((item) => <option key={item.id} value={item.id}>{item.key} · {item.name}</option>)}
-          </select>
-        </label>
-        {['OWNER', 'ADMIN'].includes(activeWorkspace?.role || '') && (
-          <button className="btn btn-secondary btn-sm" onClick={() => setShowProjectForm((shown) => !shown)} disabled={!workspaceId}>+ Proyecto</button>
-        )}
-        {['OWNER', 'ADMIN'].includes(activeWorkspace?.role || '') && (
-          <form className="member-form" onSubmit={(event) => { event.preventDefault(); void handleAddMember(); }}>
-            <input className="form-input" type="email" placeholder="Agregar miembro por email" value={memberEmail} onChange={(event) => setMemberEmail(event.target.value)} aria-label="Email del nuevo miembro" />
-            <button className="btn btn-secondary btn-sm" type="submit" disabled={!memberEmail.trim()}>Invitar</button>
+      <div className="app-main-viewport">
+        <section className="project-toolbar">
+          <label>
+            <span>Espacio</span>
+            <select className="form-select" value={workspaceId} onChange={(event) => { setWorkspaceId(event.target.value); setProjectId(''); }}>
+              {workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name} · {workspace.role}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Proyecto</span>
+            <select className="form-select" value={projectId} onChange={(event) => setProjectId(event.target.value)} disabled={!projects.length}>
+              <option value="">Selecciona un proyecto</option>
+              {projects.map((item) => <option key={item.id} value={item.id}>{item.key} · {item.name}</option>)}
+            </select>
+          </label>
+          {['OWNER', 'ADMIN'].includes(activeWorkspace?.role || '') && (
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowProjectForm((shown) => !shown)} disabled={!workspaceId}>+ Proyecto</button>
+          )}
+          {['OWNER', 'ADMIN'].includes(activeWorkspace?.role || '') && (
+            <form className="member-form" onSubmit={(event) => { event.preventDefault(); void handleAddMember(); }}>
+              <input className="form-input" type="email" placeholder="Agregar miembro por email" value={memberEmail} onChange={(event) => setMemberEmail(event.target.value)} aria-label="Email del nuevo miembro" />
+              <button className="btn btn-secondary btn-sm" type="submit" disabled={!memberEmail.trim()}>Invitar</button>
+            </form>
+          )}
+        </section>
+        {showProjectForm && (
+          <form className="project-create-form" onSubmit={(event) => { event.preventDefault(); void handleCreateProject(); }}>
+            <input className="form-input" placeholder="Nombre del proyecto" required value={projectName} onChange={(event) => setProjectName(event.target.value)} />
+            <input className="form-input project-key-input" placeholder="CLAVE" required maxLength={10} value={projectKey} onChange={(event) => setProjectKey(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} />
+            <button className="btn btn-primary btn-sm" type="submit" disabled={!projectName.trim() || projectKey.length < 2}>Crear</button>
           </form>
         )}
-      </section>
-      {showProjectForm && (
-        <form className="project-create-form" onSubmit={(event) => { event.preventDefault(); void handleCreateProject(); }}>
-          <input className="form-input" placeholder="Nombre del proyecto" required value={projectName} onChange={(event) => setProjectName(event.target.value)} />
-          <input className="form-input project-key-input" placeholder="CLAVE" required maxLength={10} value={projectKey} onChange={(event) => setProjectKey(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} />
-          <button className="btn btn-primary btn-sm" type="submit" disabled={!projectName.trim() || projectKey.length < 2}>Crear</button>
-        </form>
-      )}
-      {(errorMessage || queryError) && (
-        <div className="app-error" role="alert">
-          {errorMessage || queryError?.message}
-          <button type="button" onClick={() => { setErrorMessage(''); void issuesQuery.refetch(); void sprintsQuery.refetch(); }}>Reintentar</button>
-        </div>
-      )}
-      {!projectId ? (
-        <main className="main-content empty-project-state">
-          <h1>{projects.length ? 'Selecciona un proyecto' : 'Crea el primer proyecto de tu equipo'}</h1>
-          <p>Los proyectos, historias y actividad son compartidos con los miembros de este espacio de trabajo.</p>
-          {!projects.length && <button className="btn btn-primary" onClick={() => setShowProjectForm(true)}>Crear proyecto</button>}
-        </main>
-      ) : (
-        <>
-          {tab === 'backlog' && (
-            <BacklogPage
-              issues={issues}
-              sprints={sprints}
-              loading={issuesQuery.loading && !issuesQuery.data}
-              onOpenCreateModal={() => setIssueModalOpen(true)}
-              onOpenAiDrawer={() => setAiDrawerOpen(true)}
-              onAssignIssue={handleAssignIssue}
-            />
-          )}
-          {tab === 'board' && (
-            <BoardPage
-              issues={sprintIssues}
-              loading={issuesQuery.loading && !issuesQuery.data}
-              onUpdateStatus={handleUpdateStatus}
-              sprintName={activeSprint?.name}
-            />
-          )}
-          {tab === 'timeline' && (
-            <TimelinePage
-              sprints={sprints}
-              loading={sprintsQuery.loading && !sprintsQuery.data}
-              onCreateSprint={handleCreateSprint}
-              onStartSprint={handleStartSprint}
-              onCompleteSprint={handleCompleteSprint}
-            />
-          )}
-          {tab === 'analytics' && (
-            <AnalyticsPage
-              projectId={projectId}
-              sprint={activeSprint || null}
-              issues={issues}
-            />
-          )}
-        </>
-      )}
+        {(errorMessage || queryError) && (
+          <div className="app-error" role="alert">
+            {errorMessage || queryError?.message}
+            <button type="button" onClick={() => { setErrorMessage(''); void issuesQuery.refetch(); void sprintsQuery.refetch(); }}>Reintentar</button>
+          </div>
+        )}
+        {!projectId ? (
+          <main className="main-content empty-project-state">
+            <h1>{projects.length ? 'Selecciona un proyecto' : 'Crea el primer proyecto de tu equipo'}</h1>
+            <p>Los proyectos, historias y actividad son compartidos con los miembros de este espacio de trabajo.</p>
+            {!projects.length && <button className="btn btn-primary" onClick={() => setShowProjectForm(true)}>Crear proyecto</button>}
+          </main>
+        ) : (
+          <>
+            {tab === 'backlog' && (
+              <BacklogPage
+                issues={issues}
+                sprints={sprints}
+                loading={issuesQuery.loading && !issuesQuery.data}
+                onOpenCreateModal={() => setIssueModalOpen(true)}
+                onOpenAiDrawer={() => setAiDrawerOpen(true)}
+                onAssignIssue={handleAssignIssue}
+              />
+            )}
+            {tab === 'board' && (
+              <BoardPage
+                issues={sprintIssues}
+                loading={issuesQuery.loading && !issuesQuery.data}
+                onUpdateStatus={handleUpdateStatus}
+                sprintName={activeSprint?.name}
+              />
+            )}
+            {tab === 'timeline' && (
+              <TimelinePage
+                sprints={sprints}
+                loading={sprintsQuery.loading && !sprintsQuery.data}
+                onCreateSprint={handleCreateSprint}
+                onStartSprint={handleStartSprint}
+                onCompleteSprint={handleCompleteSprint}
+              />
+            )}
+            {tab === 'analytics' && (
+              <AnalyticsPage
+                projectId={projectId}
+                sprint={activeSprint || null}
+                issues={issues}
+              />
+            )}
+          </>
+        )}
+      </div>
       <CreateIssueModal
         isOpen={issueModalOpen}
         onClose={() => setIssueModalOpen(false)}
