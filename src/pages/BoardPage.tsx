@@ -9,10 +9,10 @@ export interface BoardPageProps {
 }
 
 const COLUMNS: { id: Issue['status']; title: string; color: string }[] = [
-  { id: 'TODO', title: 'Por Hacer (To Do)', color: '#71717a' },
-  { id: 'IN_PROGRESS', title: 'En Progreso (In Progress)', color: '#3b82f6' },
-  { id: 'IN_REVIEW', title: 'En Revisión (In Review)', color: '#f59e0b' },
-  { id: 'DONE', title: 'Listo (Done)', color: '#10b981' },
+  { id: 'TODO', title: 'Por Hacer (To Do)', color: '#5F6B7E' },
+  { id: 'IN_PROGRESS', title: 'En Progreso (In Progress)', color: '#0D172A' },
+  { id: 'IN_REVIEW', title: 'En Revisión (In Review)', color: '#8C6A48' },
+  { id: 'DONE', title: 'Listo (Done)', color: '#2E7D32' },
 ];
 
 export const BoardPage: React.FC<BoardPageProps> = ({

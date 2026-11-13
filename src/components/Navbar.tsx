@@ -6,11 +6,11 @@ export interface NavbarProps {
   onOpenCreateModal: () => void;
   onToggleAiDrawer: () => void;
   isAiDrawerOpen: boolean;
+  canCreateIssue?: boolean;
   userName?: string;
   onLogout?: () => void;
-  canCreateIssue?: boolean;
-  projectName?: string;
   projectKey?: string;
+  projectName?: string;
   workspaceName?: string;
 }
 
@@ -20,26 +20,23 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCreateModal,
   onToggleAiDrawer,
   isAiDrawerOpen,
+  canCreateIssue = true,
   userName,
   onLogout,
-  canCreateIssue = true,
-  projectName,
   projectKey,
+  projectName,
   workspaceName,
 }) => {
   return (
     <>
-      {/* Top Header / Cabecera Principal */}
+      {/* Cabecera Superior / Top Header Shell */}
       <header className="navbar" role="banner">
         <div className="nav-brand">
           <div className="nav-brand-icon" aria-hidden="true">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="16 18 22 12 16 6" />
-              <polyline points="8 6 2 12 8 18" />
-            </svg>
+            Δ
           </div>
-          <span>Jira <strong>AI</strong></span>
-          <span className="nav-badge-enterprise">Agile Slate</span>
+          <span>Project Aurora <strong>Jira AI</strong></span>
+          <span className="nav-badge-enterprise">Crema & Navy</span>
         </div>
 
         <div className="nav-actions">
@@ -90,11 +87,11 @@ export const Navbar: React.FC<NavbarProps> = ({
       <aside className="app-sidebar" aria-label="Navegación del espacio de trabajo">
         <div className="sidebar-project-header">
           <div className="project-badge-icon" aria-hidden="true">
-            {projectKey ? projectKey.slice(0, 2) : 'AI'}
+            {projectKey ? projectKey.slice(0, 2) : 'AU'}
           </div>
           <div className="project-header-info">
             <span className="project-header-title">{projectName || 'Espacio de Trabajo'}</span>
-            <span className="project-header-subtitle">{workspaceName || 'Espacio Ágil'}</span>
+            <span className="project-header-subtitle">{workspaceName || 'Entrega Continua'}</span>
           </div>
         </div>
 
@@ -136,8 +133,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             data-testid="tab-timeline"
           >
             <svg className="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
             <span>Cronograma</span>
           </button>
@@ -158,8 +157,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <div className="sidebar-footer">
           <div className="sidebar-pill">
-            <span className="sidebar-pill-dot"></span>
-            <span>Agile Slate</span>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <span className="sidebar-pill-dot"></span>
+              <span>Project Aurora</span>
+            </div>
+            <span style={{ fontSize: '10px' }}>v2.4</span>
           </div>
         </div>
       </aside>
