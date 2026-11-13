@@ -4,10 +4,18 @@ import { AuthPage } from './components/AuthPage';
 import { Navbar } from './components/Navbar';
 import { CreateIssueModal } from './components/CreateIssueModal';
 import { AIAssistantDrawer } from './components/AIAssistantDrawer';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { BacklogPage, Issue } from './pages/BacklogPage';
 import { BoardPage } from './pages/BoardPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { TimelinePage } from './pages/TimelinePage';
+import {
+  normalizePriority,
+  normalizeStatus,
+  normalizeType,
+  priorityToId,
+  typeToId,
+} from './utils/issue-utils';
 import {
   ADD_WORKSPACE_MEMBER,
   ASSIGN_ISSUES_TO_SPRINT,
@@ -86,7 +94,23 @@ export const App: React.FC = () => {
     skip: !token || !projectId,
     fetchPolicy: 'cache-and-network',
   });
-  const issues: Issue[] = issuesQuery.data?.listIssues || [];
+  const rawIssues: any[] = issuesQuery.data?.listIssues || [];
+  const issues: Issue[] = useMemo(() => {
+    return rawIssues.map((raw) => ({
+      ...raw,
+      id: String(raw.id || ''),
+      key: String(raw.key || 'INC'),
+      title: String(raw.title || 'Sin título'),
+      description: String(raw.description || ''),
+      status: normalizeStatus(raw.status),
+      priority: normalizePriority(raw.priority),
+      type: normalizeType(raw.type),
+      storyPoints: Number(raw.storyPoints) || 0,
+      sprintId: raw.sprintId || '',
+      assigneeId: raw.assigneeId || '',
+      acceptanceCriteria: raw.acceptanceCriteria || '',
+    }));
+  }, [rawIssues]);
   const sprints: Sprint[] = sprintsQuery.data?.listSprints || [];
   const activeSprint = useMemo(() => sprints.find((sprint) => sprint.status === 'ACTIVE'), [sprints]);
   const sprintIssues = activeSprint ? issues.filter((issue) => issue.sprintId === activeSprint.id) : [];
@@ -158,11 +182,19 @@ export const App: React.FC = () => {
     title: string; description: string; type: string; priority: string; storyPoints: number;
     acceptanceCriteria: string;
   }) => runAction(async () => {
-    const type = ({ STORY: 1, TASK: 2, BUG: 3, EPIC: 4 } as Record<string, number>)[newIssue.type];
-    const priority = ({ LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 } as Record<string, number>)[newIssue.priority];
+    const type = typeToId(newIssue.type);
+    const priority = priorityToId(newIssue.priority);
     await createIssue({
       variables: {
-        input: { projectId, ...newIssue, type, priority },
+        input: {
+          projectId,
+          title: newIssue.title,
+          description: newIssue.description || '',
+          type,
+          priority,
+          storyPoints: Number(newIssue.storyPoints) || 0,
+          acceptanceCriteria: newIssue.acceptanceCriteria || '',
+        },
       },
     });
     await issuesQuery.refetch();
@@ -318,7 +350,7 @@ export const App: React.FC = () => {
             {!projects.length && <button className="btn btn-primary" onClick={() => setShowProjectForm(true)}>Crear proyecto</button>}
           </main>
         ) : (
-          <>
+          <ErrorBoundary>
             {tab === 'backlog' && (
               <BacklogPage
                 issues={issues}
@@ -353,7 +385,7 @@ export const App: React.FC = () => {
                 issues={issues}
               />
             )}
-          </>
+          </ErrorBoundary>
         )}
       </div>
       <CreateIssueModal

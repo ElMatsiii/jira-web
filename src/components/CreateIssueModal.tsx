@@ -598,58 +598,73 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
       )}
 
       {/* MULTI-CARD MODE (2 to 6 CARDS): SIMULTANEOUS 3x2 GRID */}
-      {isMultiGrid && (
-        <div style={{ width: '100%', maxWidth: '1560px', margin: '0 auto', display: 'flex', flexDirection: 'column', height: '100%' }}>
-          {/* Top Sticky Bar */}
-          <div className="modal-grid-top-bar">
-            <div className="modal-grid-top-left">
-              <div>
-                <h2 className="modal-grid-top-title">Crear Nueva Incidencia</h2>
-                <p className="modal-grid-top-subtitle">
-                  Vista simultánea en Grid 3x2 — Microservicio MS1 (Go + PostgreSQL)
-                </p>
+      {isMultiGrid && (() => {
+        const isMultiRow = drafts.length > 3;
+        const cols = drafts.length === 2 ? 2 : 3;
+        const rows = isMultiRow ? 2 : 1;
+        return (
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '1560px',
+              margin: '0 auto',
+              display: 'flex',
+              flexDirection: 'column',
+              height: isMultiRow ? '100%' : 'auto',
+              maxHeight: '100%',
+            }}
+          >
+            {/* Top Sticky Bar */}
+            <div className="modal-grid-top-bar">
+              <div className="modal-grid-top-left">
+                <div>
+                  <h2 className="modal-grid-top-title">Crear Nueva Incidencia</h2>
+                  <p className="modal-grid-top-subtitle">
+                    Vista simultánea en Grid 3x2 — Microservicio MS1 (Go + PostgreSQL)
+                  </p>
+                </div>
+                <span
+                  className={`modal-grid-counter-badge ${drafts.length >= MAX_DRAFTS ? 'limit' : ''}`}
+                >
+                  {drafts.length} / {MAX_DRAFTS} recuadros simultáneos
+                </span>
               </div>
-              <span
-                className={`modal-grid-counter-badge ${drafts.length >= MAX_DRAFTS ? 'limit' : ''}`}
-              >
-                {drafts.length} / {MAX_DRAFTS} recuadros simultáneos
-              </span>
-            </div>
 
-            <div className="modal-grid-top-actions">
-              {drafts.length < MAX_DRAFTS && (
+              <div className="modal-grid-top-actions">
+                {drafts.length < MAX_DRAFTS && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleAddBlankDraft}
+                    title="Abrir un nuevo recuadro en el grid"
+                  >
+                    + Nuevo recuadro ({drafts.length}/{MAX_DRAFTS})
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
-                  onClick={handleAddBlankDraft}
-                  title="Abrir un nuevo recuadro en el grid"
+                  onClick={onClose}
+                  aria-label="Cerrar modal"
                 >
-                  + Nuevo recuadro ({drafts.length}/{MAX_DRAFTS})
+                  Cancelar
                 </button>
-              )}
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={onClose}
-                aria-label="Cerrar modal"
-              >
-                Cancelar
-              </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="form-error" role="alert" style={{ marginBottom: '8px', maxWidth: '1560px' }}>
+                {error}
+              </div>
+            )}
+
+            {/* 3x2 Grid Cards Container: strictly bounded to viewport without scroll */}
+            <div className={`modal-grid-container cols-${cols} rows-${rows}`}>
+              {drafts.map((draft, idx) => renderCardForm(draft, idx))}
             </div>
           </div>
-
-          {error && (
-            <div className="form-error" role="alert" style={{ marginBottom: '8px', maxWidth: '1560px' }}>
-              {error}
-            </div>
-          )}
-
-          {/* 3x2 Grid Cards Container: strictly bounded to viewport without scroll */}
-          <div className={`modal-grid-container cols-${Math.min(drafts.length, 3)}`}>
-            {drafts.map((draft, idx) => renderCardForm(draft, idx))}
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

@@ -1,5 +1,10 @@
 import React from 'react';
 import { Issue } from './BacklogPage';
+import {
+  normalizePriority,
+  normalizeStatus,
+  normalizeType,
+} from '../utils/issue-utils';
 
 export interface BoardPageProps {
   issues: Issue[];
@@ -8,7 +13,7 @@ export interface BoardPageProps {
   sprintName?: string;
 }
 
-const COLUMNS: { id: Issue['status']; title: string; color: string }[] = [
+const COLUMNS: { id: string; title: string; color: string }[] = [
   { id: 'TODO', title: 'Por Hacer (To Do)', color: '#5F6B7E' },
   { id: 'IN_PROGRESS', title: 'En Progreso (In Progress)', color: '#0D172A' },
   { id: 'IN_REVIEW', title: 'En Revisión (In Review)', color: '#8C6A48' },
@@ -21,8 +26,9 @@ export const BoardPage: React.FC<BoardPageProps> = ({
   onUpdateStatus,
   sprintName,
 }) => {
-  const getNextStatus = (current: Issue['status']): Issue['status'] | null => {
-    switch (current) {
+  const getNextStatus = (current: string): string | null => {
+    const norm = normalizeStatus(current);
+    switch (norm) {
       case 'TODO': return 'IN_PROGRESS';
       case 'IN_PROGRESS': return 'IN_REVIEW';
       case 'IN_REVIEW': return 'DONE';
@@ -73,7 +79,7 @@ export const BoardPage: React.FC<BoardPageProps> = ({
       ) : (
         <div className="kanban-grid">
           {COLUMNS.map((col) => {
-            const colIssues = issues.filter((i) => i.status === col.id);
+            const colIssues = (issues || []).filter((i) => normalizeStatus(i?.status) === col.id);
             return (
               <div
                 key={col.id}
@@ -102,26 +108,30 @@ export const BoardPage: React.FC<BoardPageProps> = ({
                   </div>
                 ) : (
                   colIssues.map((issue) => {
+                    const normType = normalizeType(issue.type);
+                    const normPriority = normalizePriority(issue.priority);
+                    const displayKey = issue.key || 'INC';
+                    const displayTitle = issue.title || 'Sin título';
                     const next = getNextStatus(issue.status);
                     return (
-                      <div key={issue.id || issue.key} className="kanban-card" data-testid={`card-${issue.key}`}>
+                      <div key={issue.id || displayKey} className="kanban-card" data-testid={`card-${displayKey}`}>
                         <div className="card-top">
-                          <span className="issue-key">{issue.key}</span>
-                          <span className={`badge badge-${issue.type.toLowerCase()}`}>
-                            {issue.type}
+                          <span className="issue-key">{displayKey}</span>
+                          <span className={`badge badge-${normType.toLowerCase()}`}>
+                            {normType}
                           </span>
                         </div>
-                        <div className="card-title">{issue.title}</div>
+                        <div className="card-title">{displayTitle}</div>
                         <div className="card-bottom">
-                          <span className={`priority-${issue.priority.toLowerCase()}`}>
-                            ● {issue.priority}
+                          <span className={`priority-${normPriority.toLowerCase()}`}>
+                            ● {normPriority}
                           </span>
-                          <span className="points-pill">{issue.storyPoints} SP</span>
+                          <span className="points-pill">{Number(issue.storyPoints) || 0} SP</span>
                           {next ? (
                             <button
                               className="btn btn-secondary btn-sm"
                               onClick={() => onUpdateStatus(issue.id, next)}
-                              data-testid={`btn-advance-${issue.key}`}
+                              data-testid={`btn-advance-${displayKey}`}
                               title={`Mover a ${next}`}
                             >
                               Avanzar →

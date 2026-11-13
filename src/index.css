@@ -1395,35 +1395,47 @@ code, kbd, samp, pre {
   margin: 0 auto;
   display: grid;
   gap: 10px;
-  align-items: stretch;
   box-sizing: border-box;
 }
 
 .modal-grid-container.cols-1 {
   max-width: 640px;
   grid-template-columns: 1fr;
+  height: auto;
+  max-height: calc(100vh - 72px);
+  align-items: start;
 }
 
 .modal-grid-container.cols-2 {
   max-width: 1100px;
-  height: calc(100vh - 72px);
-  max-height: calc(100vh - 72px);
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: 1fr;
+  height: auto;
+  max-height: calc(100vh - 72px);
+  align-items: start;
 }
 
 .modal-grid-container.cols-3 {
   max-width: 1560px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.modal-grid-container.rows-1 {
+  height: auto;
+  max-height: calc(100vh - 72px);
+  align-items: start;
+}
+
+.modal-grid-container.rows-2 {
   height: calc(100vh - 72px);
   max-height: calc(100vh - 72px);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
 }
 
 @media (max-width: 1200px) {
   .modal-grid-container.cols-3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: repeat(3, minmax(0, 1fr));
+    grid-template-rows: auto;
     height: auto;
     max-height: calc(100vh - 72px);
     overflow-y: auto;
@@ -1450,12 +1462,24 @@ code, kbd, samp, pre {
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 4px;
   position: relative;
   transition: all 120ms ease;
   box-sizing: border-box;
   min-height: 0;
+  overflow: hidden;
+}
+
+.modal-grid-container.rows-1 .modal-grid-card {
+  height: auto;
+  min-height: auto;
+  max-height: calc(100vh - 84px);
+  overflow-y: auto;
+}
+
+.modal-grid-container.rows-2 .modal-grid-card {
+  height: 100%;
   overflow: hidden;
 }
 

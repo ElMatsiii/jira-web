@@ -1,13 +1,21 @@
 import React, { useState } from 'react';
+import {
+  IssuePriority,
+  IssueStatus,
+  IssueType,
+  normalizePriority,
+  normalizeStatus,
+  normalizeType,
+} from '../utils/issue-utils';
 
 export interface Issue {
   id: string;
   key: string;
   title: string;
   description?: string;
-  status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
-  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  type: 'STORY' | 'TASK' | 'BUG' | 'EPIC';
+  status: IssueStatus | string;
+  priority: IssuePriority | string | number;
+  type: IssueType | string | number;
   storyPoints: number;
   sprintId?: string;
   acceptanceCriteria?: string;
@@ -23,7 +31,7 @@ export interface BacklogPageProps {
 }
 
 export const BacklogPage: React.FC<BacklogPageProps> = ({
-  issues,
+  issues = [],
   sprints = [],
   loading,
   onOpenCreateModal,
@@ -34,14 +42,17 @@ export const BacklogPage: React.FC<BacklogPageProps> = ({
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const filteredIssues = issues.filter((issue) => {
-    const matchesType = filterType === 'ALL' || issue.type === filterType;
-    const matchesSearch =
-      issue.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      issue.key.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!issue) return false;
+    const normType = normalizeType(issue.type);
+    const matchesType = filterType === 'ALL' || normType === filterType;
+    const titleStr = (issue.title || '').toLowerCase();
+    const keyStr = (issue.key || '').toLowerCase();
+    const search = (searchTerm || '').toLowerCase().trim();
+    const matchesSearch = !search || titleStr.includes(search) || keyStr.includes(search);
     return matchesType && matchesSearch;
   });
 
-  const totalPoints = filteredIssues.reduce((acc, curr) => acc + (curr.storyPoints || 0), 0);
+  const totalPoints = filteredIssues.reduce((acc, curr) => acc + (Number(curr.storyPoints) || 0), 0);
 
   return (
     <div className="main-content" data-testid="page-backlog">
@@ -180,41 +191,48 @@ export const BacklogPage: React.FC<BacklogPageProps> = ({
             </div>
           </div>
         ) : (
-          filteredIssues.map((issue) => (
-            <div key={issue.id || issue.key} className="issue-item" data-testid={`issue-row-${issue.key}`}>
-              <div className="issue-left">
-                <span className="issue-key">{issue.key}</span>
-                <span className={`badge badge-${issue.type.toLowerCase()}`}>
-                  {issue.type}
-                </span>
-                <span className="issue-title" title={issue.title}>{issue.title}</span>
+          filteredIssues.map((issue) => {
+            const normType = normalizeType(issue.type);
+            const normPriority = normalizePriority(issue.priority);
+            const normStatus = normalizeStatus(issue.status);
+            const displayKey = issue.key || 'INC';
+            const displayTitle = issue.title || 'Sin título';
+            return (
+              <div key={issue.id || displayKey} className="issue-item" data-testid={`issue-row-${displayKey}`}>
+                <div className="issue-left">
+                  <span className="issue-key">{displayKey}</span>
+                  <span className={`badge badge-${normType.toLowerCase()}`}>
+                    {normType}
+                  </span>
+                  <span className="issue-title" title={displayTitle}>{displayTitle}</span>
+                </div>
+                <div className="issue-right">
+                  <span className={`priority-${normPriority.toLowerCase()}`} title={`Prioridad: ${normPriority}`}>
+                    ● {normPriority}
+                  </span>
+                  <span className="points-pill">{Number(issue.storyPoints) || 0} SP</span>
+                  <span className="status-badge" style={{ minWidth: '95px', textAlign: 'center' }}>
+                    {normStatus}
+                  </span>
+                  {onAssignIssue && sprints.length > 0 && (
+                    <select
+                      className="form-select issue-sprint-select"
+                      aria-label={`Sprint de ${displayKey}`}
+                      value={issue.sprintId || ''}
+                      onChange={(event) => {
+                        if (event.target.value) onAssignIssue(issue.id, event.target.value);
+                      }}
+                    >
+                      <option value="">Backlog</option>
+                      {sprints.filter((sprint) => sprint.status === 'PLANNED' || sprint.status === 'ACTIVE').map((sprint) => (
+                        <option key={sprint.id} value={sprint.id}>{sprint.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               </div>
-              <div className="issue-right">
-                <span className={`priority-${issue.priority.toLowerCase()}`} title={`Prioridad: ${issue.priority}`}>
-                  ● {issue.priority}
-                </span>
-                <span className="points-pill">{issue.storyPoints} SP</span>
-                <span className="status-badge" style={{ minWidth: '95px', textAlign: 'center' }}>
-                  {issue.status}
-                </span>
-                {onAssignIssue && sprints.length > 0 && (
-                  <select
-                    className="form-select issue-sprint-select"
-                    aria-label={`Sprint de ${issue.key}`}
-                    value={issue.sprintId || ''}
-                    onChange={(event) => {
-                      if (event.target.value) onAssignIssue(issue.id, event.target.value);
-                    }}
-                  >
-                    <option value="">Backlog</option>
-                    {sprints.filter((sprint) => sprint.status === 'PLANNED' || sprint.status === 'ACTIVE').map((sprint) => (
-                      <option key={sprint.id} value={sprint.id}>{sprint.name}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
