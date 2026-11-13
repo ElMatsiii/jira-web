@@ -64,7 +64,6 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
   const [improvingDraftId, setImprovingDraftId] = useState<string | null>(null);
   const [segmenting, setSegmenting] = useState(false);
   const [suggestedSubtasks, setSuggestedSubtasks] = useState<SuggestedSubtaskItem[]>([]);
-  const [addedSubtaskTitles, setAddedSubtaskTitles] = useState<string[]>([]);
   const [error, setError] = useState('');
 
   // Reset or initialize when opened
@@ -142,7 +141,6 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
       if (drafts.length <= 1) {
         setDrafts([createInitialDraft()]);
         setSuggestedSubtasks([]);
-        setAddedSubtaskTitles([]);
         onClose();
       } else {
         setDrafts((prev) => prev.filter((d) => d.id !== draftId));
@@ -222,6 +220,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
     }
   };
 
+  // Accepting a subtask creates a new draft AND removes it from suggestions to save vertical space
   const handleAcceptSubtask = (st: SuggestedSubtaskItem) => {
     if (drafts.length >= MAX_DRAFTS) {
       setError(`Límite alcanzado: máximo ${MAX_DRAFTS} recuadros simultáneos en el grid.`);
@@ -239,7 +238,8 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
     };
 
     setDrafts((prev) => [...prev, newDraft]);
-    setAddedSubtaskTitles((prev) => [...prev, st.title]);
+    // Remove accepted suggestion so it doesn't take up space
+    setSuggestedSubtasks((prev) => prev.filter((item) => item.title !== st.title));
     setError('');
   };
 
@@ -250,10 +250,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
       return;
     }
 
-    const toAdd = suggestedSubtasks
-      .filter((st) => !addedSubtaskTitles.includes(st.title))
-      .slice(0, availableSlots);
-
+    const toAdd = suggestedSubtasks.slice(0, availableSlots);
     if (toAdd.length === 0) return;
 
     const newDrafts: IssueDraft[] = toAdd.map((st) => ({
@@ -267,7 +264,8 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
     }));
 
     setDrafts((prev) => [...prev, ...newDrafts]);
-    setAddedSubtaskTitles((prev) => [...prev, ...toAdd.map((st) => st.title)]);
+    const addedTitles = new Set(toAdd.map((st) => st.title));
+    setSuggestedSubtasks((prev) => prev.filter((st) => !addedTitles.has(st.title)));
     setError('');
   };
 
@@ -294,14 +292,14 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
             <span className="modal-grid-card-num">#{index + 1}</span>
             <span className="modal-grid-card-label">
               {draft.title.trim()
-                ? draft.title.length > 26
-                  ? draft.title.substring(0, 24) + '...'
+                ? draft.title.length > 24
+                  ? draft.title.substring(0, 22) + '...'
                   : draft.title
                 : `Recuadro ${index + 1}`}
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span className="subtask-badge sp">{draft.storyPoints} SP</span>
             {drafts.length > 1 && (
               <button
@@ -318,7 +316,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
         </div>
 
         {/* Title Input */}
-        <div className="form-group" style={{ marginBottom: '8px' }}>
+        <div className="form-group">
           <label className="form-label" htmlFor={`issue-title-${draft.id}`}>
             Título de la Incidencia *
           </label>
@@ -331,18 +329,17 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
             value={draft.title}
             onChange={(e) => updateDraft(draft.id, 'title', e.target.value)}
             data-testid={isPrimaryCard ? 'input-issue-title' : `input-issue-title-${index}`}
-            autoFocus={isPrimaryCard}
+            autoFocus={isPrimaryCard && !isMultiGrid}
           />
         </div>
 
         {/* AI Actions Row */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+        <div className="modal-grid-card-actions-row">
           <button
             type="button"
-            className="btn btn-ai"
+            className="btn btn-ai modal-grid-card-btn-ai"
             onClick={() => void handleBreakdownTask(draft)}
             disabled={segmenting || isSubmitting || !draft.title.trim()}
-            style={{ fontSize: '0.78rem', padding: '5px 10px' }}
           >
             {segmenting ? 'Segmentando...' : 'Segmentar en subtareas con IA'}
           </button>
@@ -350,90 +347,97 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
           {onImprove && (
             <button
               type="button"
-              className="btn btn-secondary btn-sm"
+              className="btn btn-secondary btn-sm modal-grid-card-btn-ai"
               onClick={() => void handleImprove(draft)}
               disabled={isImproving || isSubmitting || !draft.title.trim()}
-              style={{ fontSize: '0.78rem', padding: '5px 10px' }}
             >
               {isImproving ? 'Estimando...' : 'Sugerir criterios y estimación con IA'}
             </button>
           )}
         </div>
 
-        {/* AI Subtasks Tray (Suggested Subtasks) */}
+        {/* AI Subtasks Tray: Only renders pending unaccepted suggestions */}
         {suggestedSubtasks.length > 0 && isPrimaryCard && (
-          <div className="subtask-tray">
+          <div className="subtask-tray" style={{ maxHeight: isMultiGrid ? '160px' : '260px', overflowY: 'auto' }}>
             <div className="subtask-tray-title">
-              <span>Subtareas sugeridas por la IA para complementar esta tarea:</span>
-              {drafts.length < MAX_DRAFTS && (
+              <span>Sugerencias disponibles ({suggestedSubtasks.length}):</span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {drafts.length < MAX_DRAFTS && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-secondary"
+                    style={{ fontSize: '0.68rem', padding: '1px 6px' }}
+                    onClick={handleAcceptAllSubtasks}
+                  >
+                    + Añadir todas ({Math.min(suggestedSubtasks.length, MAX_DRAFTS - drafts.length)})
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn btn-sm btn-secondary"
-                  style={{ fontSize: '0.72rem', padding: '2px 8px' }}
-                  onClick={handleAcceptAllSubtasks}
+                  style={{ fontSize: '0.68rem', padding: '1px 5px' }}
+                  title="Ocultar bandeja de sugerencias"
+                  onClick={() => setSuggestedSubtasks([])}
                 >
-                  + Añadir todas al Grid ({MAX_DRAFTS - drafts.length} disp.)
+                  ×
                 </button>
-              )}
+              </div>
             </div>
 
             <div className="subtask-card-list">
-              {suggestedSubtasks.map((st, i) => {
-                const isAdded = addedSubtaskTitles.includes(st.title);
-                return (
-                  <div
-                    key={i}
-                    className={`subtask-card-item ${isAdded ? 'added' : ''}`}
-                    onClick={() => {
-                      if (!isAdded && drafts.length < MAX_DRAFTS) {
-                        handleAcceptSubtask(st);
-                      }
-                    }}
-                    title={isAdded ? 'Ya agregada al grid' : 'Clic para abrir este recuadro en el grid'}
-                  >
-                    <div className="subtask-card-header-row">
-                      <div className="subtask-card-title">{st.title}</div>
-                      <div className="subtask-card-badges">
-                        <span className="subtask-badge sp">{st.estimatedStoryPoints || 3} SP</span>
-                        <span className="subtask-badge">{st.type || 'TASK'}</span>
-                        <span className="subtask-badge high">{st.priority || 'MEDIUM'}</span>
-                      </div>
-                    </div>
-
-                    <div className="subtask-card-desc">{st.description}</div>
-
-                    <div className="subtask-card-footer-row">
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                        {isAdded ? 'Mostrándose en el Grid 3x2' : 'Haz clic para agregar al grid simultáneo'}
-                      </span>
-                      <button
-                        type="button"
-                        className="btn-open-recuadro"
-                        disabled={isAdded || drafts.length >= MAX_DRAFTS}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAcceptSubtask(st);
-                        }}
-                      >
-                        {isAdded ? 'Recuadro abierto' : '+ Abrir recuadro'}
-                      </button>
+              {suggestedSubtasks.map((st, i) => (
+                <div
+                  key={i}
+                  className="subtask-card-item"
+                  onClick={() => {
+                    if (drafts.length < MAX_DRAFTS) {
+                      handleAcceptSubtask(st);
+                    }
+                  }}
+                  title="Haz clic para abrir este recuadro en el grid"
+                >
+                  <div className="subtask-card-header-row">
+                    <div className="subtask-card-title">{st.title}</div>
+                    <div className="subtask-card-badges">
+                      <span className="subtask-badge sp">{st.estimatedStoryPoints || 3} SP</span>
+                      <span className="subtask-badge">{st.type || 'TASK'}</span>
+                      <span className="subtask-badge high">{st.priority || 'MEDIUM'}</span>
                     </div>
                   </div>
-                );
-              })}
+
+                  <div className="subtask-card-desc">{st.description}</div>
+
+                  <div className="subtask-card-footer-row">
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                      Clic para añadir al Grid simultáneo
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-open-recuadro"
+                      disabled={drafts.length >= MAX_DRAFTS}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAcceptSubtask(st);
+                      }}
+                    >
+                      + Abrir recuadro
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
         {/* Acceptance Criteria */}
-        <div className="form-group" style={{ marginBottom: '8px' }}>
+        <div className="form-group">
           <label className="form-label" htmlFor={`issue-acceptance-${draft.id}`}>
             Criterios de aceptación
           </label>
           <textarea
             id={`issue-acceptance-${draft.id}`}
             className="form-textarea"
-            rows={2}
+            rows={1}
             placeholder="¿Cómo sabremos que esta historia o subtarea está terminada?"
             value={draft.acceptanceCriteria}
             onChange={(e) => updateDraft(draft.id, 'acceptanceCriteria', e.target.value)}
@@ -441,14 +445,14 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
         </div>
 
         {/* Description */}
-        <div className="form-group" style={{ marginBottom: '8px' }}>
+        <div className="form-group">
           <label className="form-label" htmlFor={`issue-desc-${draft.id}`}>
             Descripción
           </label>
           <textarea
             id={`issue-desc-${draft.id}`}
             className="form-textarea"
-            rows={2}
+            rows={1}
             placeholder="Detalles técnicos o funcionales..."
             value={draft.description}
             onChange={(e) => updateDraft(draft.id, 'description', e.target.value)}
@@ -457,7 +461,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
         </div>
 
         {/* Row: Type, Priority, Story Points */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
           <div className="form-group">
             <label className="form-label" htmlFor={`issue-type-${draft.id}`}>Tipo</label>
             <select
@@ -506,14 +510,13 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
         </div>
 
         {/* Fibonacci Quick Chips */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '14px' }}>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-subtle)', marginRight: '2px' }}>Fibonacci:</span>
+        <div className="modal-grid-card-fibonacci">
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-subtle)', marginRight: '2px' }}>Fibonacci:</span>
           {[1, 2, 3, 5, 8, 13].map((pts) => (
             <button
               key={pts}
               type="button"
               className={`btn btn-sm ${draft.storyPoints === pts ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ fontSize: '0.68rem', padding: '1px 6px' }}
               onClick={() => updateDraft(draft.id, 'storyPoints', pts)}
             >
               {pts}
@@ -522,7 +525,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
         </div>
 
         {/* Card Footer Actions */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '10px', borderTop: '1px solid var(--border-color)' }}>
+        <div className="modal-grid-card-footer">
           <button
             type="button"
             className="btn btn-secondary btn-sm"
@@ -576,7 +579,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
           </div>
 
           {/* Quick bar to add new blank recuadro */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
             <button
               type="button"
               className="modal-deck-add-btn"
@@ -587,7 +590,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
             </button>
           </div>
 
-          {error && <div className="form-error" role="alert" style={{ marginBottom: '14px' }}>{error}</div>}
+          {error && <div className="form-error" role="alert" style={{ marginBottom: '10px' }}>{error}</div>}
 
           {/* Render the single centered card */}
           {renderCardForm(drafts[0], 0)}
@@ -596,7 +599,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
 
       {/* MULTI-CARD MODE (2 to 6 CARDS): SIMULTANEOUS 3x2 GRID */}
       {isMultiGrid && (
-        <div style={{ width: '100%', maxWidth: '1560px', margin: '0 auto' }}>
+        <div style={{ width: '100%', maxWidth: '1560px', margin: '0 auto', display: 'flex', flexDirection: 'column', height: '100%' }}>
           {/* Top Sticky Bar */}
           <div className="modal-grid-top-bar">
             <div className="modal-grid-top-left">
@@ -636,12 +639,12 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
           </div>
 
           {error && (
-            <div className="form-error" role="alert" style={{ marginBottom: '14px', maxWidth: '1560px' }}>
+            <div className="form-error" role="alert" style={{ marginBottom: '8px', maxWidth: '1560px' }}>
               {error}
             </div>
           )}
 
-          {/* 3x2 Grid Cards Container */}
+          {/* 3x2 Grid Cards Container: strictly bounded to viewport without scroll */}
           <div className={`modal-grid-container cols-${Math.min(drafts.length, 3)}`}>
             {drafts.map((draft, idx) => renderCardForm(draft, idx))}
           </div>

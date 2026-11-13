@@ -1304,8 +1304,10 @@ code, kbd, samp, pre {
 }
 
 .modal-overlay.grid-mode {
-  align-items: flex-start;
-  padding: 16px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  overflow: hidden;
 }
 
 .modal-card,
@@ -1315,7 +1317,7 @@ code, kbd, samp, pre {
   border-radius: var(--radius-xl);
   max-width: 620px;
   width: 100%;
-  max-height: 90vh;
+  max-height: 92vh;
   overflow-y: auto;
   box-shadow: var(--shadow-xl);
   padding: var(--space-xl);
@@ -1324,51 +1326,49 @@ code, kbd, samp, pre {
 }
 
 /* ==========================================================================
-   Simultaneous 3x2 Grid Modal for Issue Creation
+   Simultaneous 3x2 Grid Modal for Issue Creation (Fits in 100vh Without Scrolling)
    ========================================================================== */
 .modal-grid-top-bar {
   width: 100%;
   max-width: 1560px;
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  padding: 6px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 0 auto 16px auto;
-  box-shadow: var(--shadow-md);
-  position: sticky;
-  top: 0;
+  margin: 0 auto 8px auto;
+  box-shadow: var(--shadow-sm);
   z-index: 20;
 }
 
 .modal-grid-top-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
 }
 
 .modal-grid-top-title {
   font-family: var(--font-headline);
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-main);
   margin: 0;
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 .modal-grid-top-subtitle {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-muted);
-  margin: 2px 0 0 0;
+  margin: 1px 0 0 0;
 }
 
 .modal-grid-counter-badge {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
-  padding: 3px 10px;
+  padding: 2px 8px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
   background-color: var(--bg-page);
@@ -1385,17 +1385,18 @@ code, kbd, samp, pre {
 .modal-grid-top-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
-/* 3x2 Grid Container */
+/* 3x2 Grid Container: strictly bounded to viewport height */
 .modal-grid-container {
   width: 100%;
   max-width: 1560px;
   margin: 0 auto;
   display: grid;
-  gap: 16px;
-  align-items: start;
+  gap: 10px;
+  align-items: stretch;
+  box-sizing: border-box;
 }
 
 .modal-grid-container.cols-1 {
@@ -1405,17 +1406,27 @@ code, kbd, samp, pre {
 
 .modal-grid-container.cols-2 {
   max-width: 1100px;
+  height: calc(100vh - 72px);
+  max-height: calc(100vh - 72px);
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: 1fr;
 }
 
 .modal-grid-container.cols-3 {
   max-width: 1560px;
+  height: calc(100vh - 72px);
+  max-height: calc(100vh - 72px);
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
 }
 
 @media (max-width: 1200px) {
   .modal-grid-container.cols-3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    height: auto;
+    max-height: calc(100vh - 72px);
+    overflow-y: auto;
   }
 }
 
@@ -1423,6 +1434,10 @@ code, kbd, samp, pre {
   .modal-grid-container.cols-2,
   .modal-grid-container.cols-3 {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    height: auto;
+    max-height: calc(100vh - 72px);
+    overflow-y: auto;
   }
 }
 
@@ -1430,19 +1445,22 @@ code, kbd, samp, pre {
 .modal-grid-card {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-xl);
-  padding: 18px 20px;
-  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 4px;
   position: relative;
-  transition: all 150ms ease;
+  transition: all 120ms ease;
   box-sizing: border-box;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .modal-grid-card:hover {
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-md);
   border-color: var(--secondary-brand);
 }
 
@@ -1450,50 +1468,135 @@ code, kbd, samp, pre {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 10px;
+  padding-bottom: 4px;
   border-bottom: 1px solid var(--border-color);
+  margin-bottom: 2px;
 }
 
 .modal-grid-card-title-badge {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .modal-grid-card-num {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: #FBF8F2;
   background-color: var(--primary-brand);
-  padding: 2px 7px;
+  padding: 1px 5px;
   border-radius: 4px;
 }
 
 .modal-grid-card-label {
   font-family: var(--font-headline);
-  font-size: 14px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 220px;
+  max-width: 170px;
 }
 
 .modal-grid-card-close {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   border: 1px solid var(--border-color);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   padding: 0;
+  font-size: 13px;
+  line-height: 1;
   transition: all 120ms ease;
+}
+
+.modal-grid-card-close:hover {
+  background-color: #FEE2E2;
+  color: #DC2626;
+  border-color: #FCA5A5;
+}
+
+/* Compact form elements in grid cards */
+.modal-grid-card .form-group {
+  margin-bottom: 3px;
+}
+
+.modal-grid-card .form-label {
+  font-size: 10px;
+  font-weight: 600;
+  margin-bottom: 1px;
+  color: var(--text-body);
+  display: block;
+  line-height: 1.1;
+}
+
+.modal-grid-card .form-input,
+.modal-grid-card .form-select {
+  height: 26px;
+  padding: 2px 7px;
+  font-size: 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  box-sizing: border-box;
+}
+
+.modal-grid-card .form-textarea {
+  font-size: 10.5px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  resize: none;
+  min-height: 30px;
+  max-height: 38px;
+  line-height: 1.25;
+  box-sizing: border-box;
+}
+
+.modal-grid-card-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 2px;
+}
+
+.modal-grid-card-btn-ai {
+  font-size: 10px !important;
+  padding: 2px 6px !important;
+  line-height: 1.2 !important;
+}
+
+.modal-grid-card-fibonacci {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 4px;
+}
+
+.modal-grid-card-fibonacci button {
+  font-size: 9.5px !important;
+  padding: 1px 5px !important;
+  min-width: 17px;
+  line-height: 1.1;
+}
+
+.modal-grid-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 4px;
+  margin-top: auto;
+  border-top: 1px solid var(--border-color);
+}
+
+.modal-grid-card-footer button {
+  font-size: 10.5px !important;
+  padding: 3px 8px !important;
 }
 
 .modal-grid-card-close:hover {
