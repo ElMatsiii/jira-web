@@ -102,7 +102,7 @@ describe('Web Components Suite', () => {
       expect(onClose).toHaveBeenCalledTimes(2);
     });
 
-    it('should allow AI segmentation and opening a second customizable recuadro up to maximum 6', async () => {
+    it('should allow AI segmentation and opening a second customizable recuadro up to maximum 8', async () => {
       const onBreakdownTask = jest.fn().mockResolvedValue({
         parentTitle: 'crear la base de la pagina web',
         subtasks: [
@@ -156,19 +156,19 @@ describe('Web Components Suite', () => {
       fireEvent.click(openButtons[0]);
 
       // Now we should have 2 recuadros active simultaneously in the grid
-      expect(screen.getByText(/2 \/ 6 recuadros/)).toBeInTheDocument();
+      expect(screen.getByText(/2 \/ 8 recuadros/)).toBeInTheDocument();
       // Both the original card and the new accepted card are simultaneously visible in the grid
       expect(screen.getByDisplayValue('crear la base de la pagina web')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Crear frontend base')).toBeInTheDocument();
 
-      // Add blank drafts until reaching max 6
-      for (let i = 2; i < 6; i++) {
-        const addBtn = screen.getByText(new RegExp(`\\+ Nuevo recuadro \\(${i}/6\\)`));
+      // Add blank drafts until reaching max 8
+      for (let i = 2; i < 8; i++) {
+        const addBtn = screen.getByText(new RegExp(`\\+ Nuevo recuadro \\(${i}/8\\)`));
         fireEvent.click(addBtn);
       }
-      expect(screen.getByText(/6 \/ 6 recuadros/)).toBeInTheDocument();
+      expect(screen.getByText(/8 \/ 8 recuadros/)).toBeInTheDocument();
 
-      // Attempting to add beyond 6 is blocked
+      // Attempting to add beyond 8 is blocked
       expect(screen.queryByText(/\+ Nuevo recuadro/)).not.toBeInTheDocument();
     });
 

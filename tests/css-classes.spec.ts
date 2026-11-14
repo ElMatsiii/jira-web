@@ -33,6 +33,7 @@ describe('CSS rules for the AI drawer and the new-draft button', () => {
   it.each([
     ['AIAssistantDrawer', drawerSource],
     ['AIStoryDetailModal', readFileSync(join(__dirname, '..', 'src', 'components', 'AIStoryDetailModal.tsx'), 'utf8')],
+    ['CreateIssueModal', modalSource],
   ])('defines a rule for every literal class used by %s', (_name, source) => {
     // Literal tokens from className="..." and className={`...`} (template expressions are skipped).
     const tokens = [
