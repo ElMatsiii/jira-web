@@ -210,6 +210,34 @@ describe('Web Components Suite', () => {
       expect(container.firstChild).toBeNull();
     });
 
+    it('closes when clicking the backdrop or the close button, but not when clicking inside the panel', () => {
+      const onClose = jest.fn();
+      render(<AIAssistantDrawer isOpen={true} onClose={onClose} onDecomposeEpic={jest.fn()} />);
+
+      expect(screen.getByRole('dialog', { name: 'Asistente Scrum Master IA' })).toHaveAttribute('aria-modal', 'true');
+
+      fireEvent.click(screen.getByTestId('ai-drawer'));
+      fireEvent.click(screen.getByTestId('input-ai-epic-title'));
+      fireEvent.click(screen.getByText('Desglosar una épica'));
+      expect(onClose).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByTestId('ai-drawer-backdrop'));
+      expect(onClose).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByLabelText('Cerrar panel IA'));
+      expect(onClose).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps the panel interactive: typing in the form does not close it', () => {
+      const onClose = jest.fn();
+      render(<AIAssistantDrawer isOpen={true} onClose={onClose} onDecomposeEpic={jest.fn()} />);
+
+      fireEvent.change(screen.getByTestId('input-ai-epic-desc'), { target: { value: 'Webhooks' } });
+      fireEvent.keyDown(screen.getByTestId('input-ai-epic-desc'), { key: 'Enter' });
+      expect(screen.getByTestId('input-ai-epic-desc')).toHaveValue('Webhooks');
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
     it('should populate inputs when clicking a quick suggestion template', () => {
       const onClose = jest.fn();
       render(

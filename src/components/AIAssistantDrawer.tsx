@@ -64,8 +64,16 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
   };
 
   return (
-    <aside className="drawer-overlay" role="complementary" aria-label="Asistente Scrum Master IA" data-testid="ai-drawer">
-      <div className="drawer-header">
+    <div
+      className="ai-drawer-backdrop"
+      data-testid="ai-drawer-backdrop"
+      onClick={(event) => {
+        // Only a click on the dimmed area itself closes; clicks inside the panel never reach here as target.
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+    <aside className="ai-drawer" role="dialog" aria-modal="true" aria-label="Asistente Scrum Master IA" data-testid="ai-drawer">
+      <div className="ai-drawer-header">
         <div>
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.98rem', color: 'var(--text-main)', fontWeight: 700 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -84,7 +92,7 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
             Acciones asistidas; revisa las propuestas antes de incorporarlas al proyecto.
           </p>
         </div>
-        <button className="btn btn-secondary btn-sm" onClick={onClose} aria-label="Cerrar panel IA">
+        <button type="button" className="btn btn-secondary btn-sm ai-drawer-close" onClick={onClose} aria-label="Cerrar panel IA">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
@@ -92,7 +100,7 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
         </button>
       </div>
 
-      <div className="drawer-body">
+      <div className="ai-drawer-body">
         <div className="ai-action-intro">
           <strong>Desglosar una épica</strong>
           <p>Genera historias candidatas con criterios de aceptación y estimaciones para que el equipo las revise.</p>
@@ -237,12 +245,13 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
         )}
       </div>
 
-      <div className="drawer-footer">
+      <div className="ai-drawer-footer">
         <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span className="pulse-dot"></span>
           Las propuestas de IA no se guardan automáticamente; revísalas antes de aplicarlas.
         </small>
       </div>
     </aside>
+    </div>
   );
 };
