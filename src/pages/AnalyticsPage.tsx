@@ -120,11 +120,17 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint,
               <h2 className="analytics-section-title">{sprint.name} · Burndown</h2>
               <p className="page-subtitle">{sprint.goal || 'Sin objetivo definido'}</p>
               {ideal.length > 1 && actual.length > 1 ? (
-                <svg viewBox={`0 0 ${width} ${height}`} className="burndown-chart" role="img" aria-label="Gráfico de burndown del sprint">
-                  <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#3f3f46" />
-                  <polyline fill="none" stroke="#71717a" strokeDasharray="4 4" strokeWidth="2" points={getPoints(ideal)} />
-                  <polyline fill="none" stroke="#3b82f6" strokeWidth="2.5" points={getPoints(actual)} />
-                </svg>
+                <>
+                  <svg viewBox={`0 0 ${width} ${height}`} className="burndown-chart" role="img" aria-label="Gráfico de burndown del sprint">
+                    <line className="burndown-axis" x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} />
+                    <polyline className="burndown-ideal" fill="none" strokeDasharray="4 4" strokeWidth="2" points={getPoints(ideal)} />
+                    <polyline className="burndown-actual" fill="none" strokeWidth="2.5" points={getPoints(actual)} />
+                  </svg>
+                  <div className="burndown-legend">
+                    <span className="burndown-legend-item is-ideal">Ideal</span>
+                    <span className="burndown-legend-item">Real</span>
+                  </div>
+                </>
               ) : <div className="empty-state-box">El burndown estará disponible cuando se registren cambios de trabajo durante el sprint.</div>}
             </section>
             <section className="analytics-kpis">
@@ -159,7 +165,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint,
             <option value="">Selecciona una historia</option>
             {issues.map((issue) => <option key={issue.id} value={issue.id}>{issue.key} · {issue.title}</option>)}
           </select>
-          <input className="form-input" type="number" min="0.01" max="24" step="0.25" required value={hours} onChange={(event) => setHours(event.target.value)} aria-label="Horas trabajadas" />
+          <input className="form-input" type="number" min="0.25" max="24" step="0.25" required value={hours} onChange={(event) => setHours(event.target.value)} aria-label="Horas trabajadas" />
           <input className="form-input" maxLength={500} placeholder="¿En qué se trabajó? (opcional)" value={workNote} onChange={(event) => setWorkNote(event.target.value)} aria-label="Nota del registro de tiempo" />
           <button className="btn btn-primary" type="submit" disabled={!issueId || recordWorkState.loading}>{recordWorkState.loading ? 'Guardando...' : 'Registrar tiempo'}</button>
         </form>
