@@ -30,6 +30,20 @@ describe('CSS rules for the AI drawer and the new-draft button', () => {
     expect(used.filter((name) => !hasRule(name))).toEqual([]);
   });
 
+  it.each([
+    ['AIAssistantDrawer', drawerSource],
+    ['AIStoryDetailModal', readFileSync(join(__dirname, '..', 'src', 'components', 'AIStoryDetailModal.tsx'), 'utf8')],
+  ])('defines a rule for every literal class used by %s', (_name, source) => {
+    // Literal tokens from className="..." and className={`...`} (template expressions are skipped).
+    const tokens = [
+      ...(source.match(/className="[^"]*"/g) || []).map((attr) => attr.slice('className="'.length, -1)),
+      ...(source.match(/className=\{`[^`]*`\}/g) || []).map((attr) => attr.slice('className={`'.length, -2).replace(/\$\{[^}]*\}/g, ' ')),
+    ].flatMap((value) => value.split(/\s+/))
+      .filter((name) => /^[a-z][\w-]*[a-z0-9]$/i.test(name));
+    expect(tokens.length).toBeGreaterThan(10);
+    expect(Array.from(new Set(tokens)).filter((name) => !hasRule(name))).toEqual([]);
+  });
+
   it('defines a rule for the "+ Nuevo recuadro" button used by CreateIssueModal', () => {
     expect(modalSource).toContain('className="modal-deck-add-btn"');
     expect(hasRule('modal-deck-add-btn')).toBe(true);

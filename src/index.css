@@ -1866,6 +1866,235 @@ code, kbd, samp, pre {
   background-color: var(--bg-surface-muted);
 }
 
+.ai-drawer-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.ai-drawer-subtitle {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.ai-drawer-footnote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* AI drawer content: intro, epic form/summary, proposed stories */
+.ai-action-intro {
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  background-color: var(--bg-surface-muted);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--primary-brand);
+  border-radius: var(--radius-md);
+}
+
+.ai-action-intro strong {
+  display: block;
+  font-size: 0.88rem;
+  color: var(--text-main);
+}
+
+.ai-action-intro p {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.ai-quick-templates {
+  margin-bottom: var(--space-md);
+}
+
+.ai-quick-templates-label {
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+  color: var(--text-subtle);
+}
+
+.ai-quick-templates-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ai-epic-form {
+  margin-top: var(--space-sm);
+}
+
+.ai-epic-form-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.ai-generate-btn {
+  flex: 1;
+}
+
+.ai-epic-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background-color: var(--bg-surface-muted);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.ai-epic-summary-text {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  font-size: 0.85rem;
+  color: var(--text-main);
+}
+
+.ai-epic-summary-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-drawer-error {
+  margin-top: var(--space-lg);
+}
+
+.ai-drawer-error p {
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+.ai-results {
+  margin-top: var(--space-xl);
+}
+
+.ai-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.ai-results-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-main);
+}
+
+.ai-results-count {
+  font-weight: 500;
+  text-transform: none;
+  color: var(--color-accent-sage);
+}
+
+.ai-results-empty {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.ai-story-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.ai-story-card {
+  padding: var(--space-md);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--primary-brand);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  transition: border-color 120ms ease;
+}
+
+.ai-story-card:hover {
+  border-color: var(--border-hover);
+  border-left-color: var(--primary-brand);
+}
+
+.ai-story-card.is-created {
+  background-color: var(--bg-surface-muted);
+  border-left-color: var(--color-accent-sage);
+}
+
+.ai-story-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-main);
+}
+
+.ai-story-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: 6px;
+}
+
+.ai-story-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-sm);
+}
+
+.ai-story-created {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-accent-sage);
+}
+
+/* Story detail modal, opened over the drawer (whose backdrop already dims the page) */
+.ai-story-detail-overlay {
+  background-color: rgba(13, 23, 42, 0.3);
+}
+
+.ai-story-detail {
+  max-width: 640px;
+}
+
+.ai-story-detail-heading {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.ai-story-detail .ai-story-meta {
+  margin: 0 0 var(--space-lg);
+}
+
+.ai-gherkin-input {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ai-story-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-color);
+}
+
 @keyframes ai-drawer-slide-in {
   from { transform: translateX(100%); }
   to { transform: translateX(0); }

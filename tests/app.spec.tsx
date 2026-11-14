@@ -266,7 +266,7 @@ describe('App', () => {
     fireEvent.change(screen.getByTestId('input-ai-epic-title'), { target: { value: 'Pagos' } });
     fireEvent.click(screen.getByTestId('btn-ai-decompose-submit'));
 
-    const createButtons = await screen.findAllByText('Crear historia');
+    const createButtons = await screen.findAllByRole('button', { name: 'Crear' });
     fireEvent.click(createButtons[0]);
     await waitFor(() => expect(createIssueMock).toHaveBeenCalledTimes(1));
     fireEvent.click(createButtons[1]);
