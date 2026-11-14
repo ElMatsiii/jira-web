@@ -269,14 +269,16 @@ export const App: React.FC = () => {
     return result;
   };
 
-  const handleCreateSuggestedStory = (story: {
+  const handleCreateSuggestedStory = async (story: {
     title: string;
     description: string;
     type: string;
     priority?: string;
     estimatedStoryPoints: number;
     acceptanceCriteriaGherkin: string;
-  }) => runAction(async () => {
+  }) => {
+    // Not wrapped in runAction: the AI drawer catches the rejection and shows the error itself,
+    // so it must not also appear in the global banner.
     await createIssue({
       variables: {
         input: {
@@ -291,7 +293,7 @@ export const App: React.FC = () => {
       },
     });
     await issuesQuery.refetch();
-  });
+  };
 
   const queryError = issuesQuery.error || sprintsQuery.error || projectsQuery.error;
 

@@ -233,6 +233,41 @@ describe('App', () => {
     expect(window.localStorage.getItem('jira-ai-token')).toBeNull();
   });
 
+  it('shows an AI story creation error only inside the drawer, not in the global banner', async () => {
+    const createIssueMock = jest.fn().mockRejectedValue(new Error('Proyecto no encontrado'));
+    const defaultUseMutation = apolloMocks.useMutation.getMockImplementation()!;
+    apolloMocks.useMutation.mockImplementation((mutation: any) => {
+      const name = mutation.definitions.find((d: any) => d.kind === 'OperationDefinition')?.name?.value;
+      if (name === 'CreateIssue') return [createIssueMock, { loading: false, error: undefined }];
+      if (name === 'AiDecomposeEpic') {
+        return [jest.fn().mockResolvedValue({
+          data: {
+            aiDecomposeEpic: {
+              epicTitle: 'Pagos',
+              stories: [{ title: 'Pasarela', description: 'd', type: 'STORY', priority: 'HIGH', estimatedStoryPoints: 3, acceptanceCriteriaGherkin: 'g' }],
+            },
+          },
+        }), { loading: false, error: undefined }];
+      }
+      return defaultUseMutation(mutation);
+    });
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    renderApp();
+    await selectProject();
+
+    fireEvent.click(screen.getByTestId('btn-ai-assistant'));
+    fireEvent.change(screen.getByTestId('input-ai-epic-title'), { target: { value: 'Pagos' } });
+    fireEvent.click(screen.getByTestId('btn-ai-decompose-submit'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Crear' }));
+
+    await waitFor(() => expect(createIssueMock).toHaveBeenCalledTimes(1));
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toHaveTextContent('Proyecto no encontrado');
+    expect(screen.getByTestId('ai-drawer')).toContainElement(alerts[0]);
+    expect(document.querySelector('.app-error')).toBeNull();
+  });
+
   it('creates AI-suggested stories keeping their type and priority', async () => {
     const createIssueMock = jest.fn().mockResolvedValue({ data: { createIssue: { id: 'issue-9' } } });
     const defaultUseMutation = apolloMocks.useMutation.getMockImplementation()!;
