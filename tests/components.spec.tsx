@@ -171,6 +171,35 @@ describe('Web Components Suite', () => {
       // Attempting to add beyond 6 is blocked
       expect(screen.queryByText(/\+ Nuevo recuadro/)).not.toBeInTheDocument();
     });
+
+    it('shows an unavailable message instead of invented subtasks when there is no AI backend', () => {
+      render(<CreateIssueModal isOpen={true} onClose={jest.fn()} onCreate={jest.fn()} />);
+      fireEvent.change(screen.getByTestId('input-issue-title'), { target: { value: 'Pagos' } });
+      fireEvent.click(screen.getByText('Segmentar en subtareas con IA'));
+
+      expect(screen.getByText(/El asistente de IA no está disponible/)).toBeInTheDocument();
+      expect(screen.queryByText(/Crear Frontend para/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Sugerencias disponibles/)).not.toBeInTheDocument();
+    });
+
+    it('tells the user when the AI returns no subtasks', async () => {
+      const onBreakdownTask = jest.fn().mockResolvedValue({ parentTitle: 'Pagos', subtasks: [] });
+      render(<CreateIssueModal isOpen={true} onClose={jest.fn()} onCreate={jest.fn()} onBreakdownTask={onBreakdownTask} />);
+      fireEvent.change(screen.getByTestId('input-issue-title'), { target: { value: 'Pagos' } });
+      fireEvent.click(screen.getByText('Segmentar en subtareas con IA'));
+
+      expect(await screen.findByText('La IA no devolvió subtareas para esta incidencia.')).toBeInTheDocument();
+      expect(screen.queryByText(/Sugerencias disponibles/)).not.toBeInTheDocument();
+    });
+
+    it('shows the AI error message when segmentation fails', async () => {
+      const onBreakdownTask = jest.fn().mockRejectedValue(new Error('Agente caído'));
+      render(<CreateIssueModal isOpen={true} onClose={jest.fn()} onCreate={jest.fn()} onBreakdownTask={onBreakdownTask} />);
+      fireEvent.change(screen.getByTestId('input-issue-title'), { target: { value: 'Pagos' } });
+      fireEvent.click(screen.getByText('Segmentar en subtareas con IA'));
+
+      expect(await screen.findByText('Agente caído')).toBeInTheDocument();
+    });
   });
 
   describe('AIAssistantDrawer Component', () => {

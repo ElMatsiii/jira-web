@@ -157,42 +157,22 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
       setError('Ingresa un título para que la IA genere subtareas complementarias.');
       return;
     }
+    if (!onBreakdownTask) {
+      setSuggestedSubtasks([]);
+      setError('El asistente de IA no está disponible en este momento. Inténtalo más tarde.');
+      return;
+    }
     setSegmenting(true);
     setError('');
     try {
-      if (onBreakdownTask) {
-        const res = await onBreakdownTask({
-          title: sourceDraft.title,
-          description: sourceDraft.description,
-        });
-        setSuggestedSubtasks(res.subtasks || []);
-      } else {
-        setSuggestedSubtasks([
-          {
-            title: `Crear Frontend para ${sourceDraft.title}`,
-            description: 'Estructurar vistas cliente, componentes reutilizables y estilos.',
-            type: 'TASK',
-            priority: 'HIGH',
-            estimatedStoryPoints: 3,
-            acceptanceCriteriaGherkin: 'Given la interfaz When el usuario interactúa Then responde visualmente',
-          },
-          {
-            title: `Crear Backend y API para ${sourceDraft.title}`,
-            description: 'Servicios de lógica de negocio, endpoints y persistencia de datos.',
-            type: 'TASK',
-            priority: 'HIGH',
-            estimatedStoryPoints: 5,
-            acceptanceCriteriaGherkin: 'Given endpoints activos When se envían peticiones Then retorna estado 200',
-          },
-          {
-            title: `Configurar Base de Datos para ${sourceDraft.title}`,
-            description: 'Esquema de tablas, índices y migraciones de datos.',
-            type: 'TASK',
-            priority: 'MEDIUM',
-            estimatedStoryPoints: 3,
-            acceptanceCriteriaGherkin: 'Given la base conectada When se ejecutan migraciones Then las tablas se configuran',
-          },
-        ]);
+      const res = await onBreakdownTask({
+        title: sourceDraft.title,
+        description: sourceDraft.description,
+      });
+      const subtasks = res?.subtasks || [];
+      setSuggestedSubtasks(subtasks);
+      if (!subtasks.length) {
+        setError('La IA no devolvió subtareas para esta incidencia.');
       }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'No se pudieron generar subtareas.');
