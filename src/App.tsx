@@ -94,9 +94,10 @@ export const App: React.FC = () => {
     skip: !token || !projectId,
     fetchPolicy: 'cache-and-network',
   });
-  const rawIssues: any[] = issuesQuery.data?.listIssues || [];
+  // Keep the Apollo reference (not a fresh `|| []`) as the memo dependency so it only recomputes on new data.
+  const rawIssues: any[] | undefined = issuesQuery.data?.listIssues;
   const issues: Issue[] = useMemo(() => {
-    return rawIssues.map((raw) => ({
+    return (rawIssues || []).map((raw) => ({
       ...raw,
       id: String(raw.id || ''),
       key: String(raw.key || 'INC'),
@@ -144,6 +145,10 @@ export const App: React.FC = () => {
       throw error;
     }
   };
+
+  // For fire-and-forget actions (board/backlog/timeline buttons): the banner shows the error,
+  // so the rejection is swallowed instead of becoming an unhandled promise rejection.
+  const runBannerAction = (action: () => Promise<unknown>) => runAction(action).catch(() => undefined);
 
   if (!token) return <AuthPage onAuthenticated={setToken} />;
   if (meQuery.error) {
@@ -200,12 +205,12 @@ export const App: React.FC = () => {
     await issuesQuery.refetch();
   });
 
-  const handleUpdateStatus = (id: string, status: string) => runAction(async () => {
+  const handleUpdateStatus = (id: string, status: string) => runBannerAction(async () => {
     await updateIssueStatus({ variables: { input: { id, status } } });
     await issuesQuery.refetch();
   });
 
-  const handleAssignIssue = (id: string, sprintId: string) => runAction(async () => {
+  const handleAssignIssue = (id: string, sprintId: string) => runBannerAction(async () => {
     await assignIssuesToSprint({ variables: { input: { issueIds: [id], sprintId } } });
     await issuesQuery.refetch();
     await sprintsQuery.refetch();
@@ -227,12 +232,12 @@ export const App: React.FC = () => {
       await sprintsQuery.refetch();
     });
 
-  const handleStartSprint = (id: string) => runAction(async () => {
+  const handleStartSprint = (id: string) => runBannerAction(async () => {
     await startSprint({ variables: { id } });
     await sprintsQuery.refetch();
   });
 
-  const handleCompleteSprint = (id: string) => runAction(async () => {
+  const handleCompleteSprint = (id: string) => runBannerAction(async () => {
     await completeSprint({ variables: { id } });
     await sprintsQuery.refetch();
   });

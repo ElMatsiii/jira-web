@@ -44,6 +44,8 @@ export const TimelinePage: React.FC<TimelinePageProps> = ({
       await onCreateSprint({ name, goal, startDate, endDate });
       setName('');
       setGoal('');
+    } catch {
+      // The parent shows the error banner; keep the form values so the user can retry.
     } finally {
       setSubmitting(false);
     }

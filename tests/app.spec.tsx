@@ -18,9 +18,23 @@ const apolloMocks = jest.requireMock('@apollo/client') as {
   useMutation: jest.Mock;
 };
 
+const renderApp = () => render(
+  <ApolloProvider client={createApolloClient('http://localhost/graphql')}>
+    <App />
+  </ApolloProvider>,
+);
+
+const selectProject = async () => {
+  fireEvent.change(await screen.findByLabelText('Proyecto'), { target: { value: 'project-1' } });
+  await screen.findByText('PLAT-1');
+};
+
 describe('App', () => {
+  let mutations: Record<string, jest.Mock>;
+
   beforeEach(() => {
     window.localStorage.clear();
+    mutations = {};
     apolloMocks.useQuery.mockImplementation((query: any) => {
       const operation = query.definitions.find((definition: any) => definition.kind === 'OperationDefinition');
       const name = operation?.name?.value;
@@ -38,7 +52,13 @@ describe('App', () => {
         Me: { me: { id: 'user-1', name: 'Ana', email: 'ana@example.com' }, myWorkspaces: [{ id: 'workspace-1', name: 'Equipo Ana', role: 'OWNER' }] },
         WorkspaceProjects: { workspaceProjects: [project] },
         GetBacklog: { listIssues: [issue] },
-        GetSprints: { listSprints: [sprint] },
+        GetSprints: {
+          listSprints: [sprint, {
+            id: 'sprint-2', name: 'Sprint 2', goal: 'Siguiente', status: 'PLANNED',
+            startDate: '2026-11-16T00:00:00.000Z', endDate: '2026-11-30T23:59:59.000Z',
+            totalStoryPoints: 0, completedStoryPoints: 0,
+          }],
+        },
         GetBurndownAnalytics: { getBurndownAnalytics: { sprintId: 'sprint-1', velocity: 5, idealBurndown: [5, 0], actualBurndown: [5, 2], blockedCount: 0, healthStatus: 'HEALTHY' } },
         ProjectWorkLogs: { projectWorkLogs: { totalHours: 0, entries: [] } },
       };
@@ -61,7 +81,8 @@ describe('App', () => {
         AiBreakdownTask: { aiBreakdownTask: { parentTitle: 'Tarea', subtasks: [] } },
         AddWorkspaceMember: { addWorkspaceMember: { id: 'user-2', email: 'member@example.com' } },
       };
-      return [jest.fn().mockResolvedValue({ data: resultByName[name] }), { loading: false, error: undefined }];
+      mutations[name] = mutations[name] || jest.fn().mockResolvedValue({ data: resultByName[name] });
+      return [mutations[name], { loading: false, error: undefined }];
     });
   });
 
@@ -122,6 +143,94 @@ describe('App', () => {
 
     fireEvent.click(screen.getByTestId('tab-analytics'));
     expect(screen.getByTestId('page-analytics')).toBeInTheDocument();
+  });
+
+  it('creates a project and invites a member as workspace owner', async () => {
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    renderApp();
+
+    fireEvent.click(await screen.findByText('+ Proyecto'));
+    fireEvent.change(screen.getByPlaceholderText('Nombre del proyecto'), { target: { value: 'Nuevo' } });
+    fireEvent.change(screen.getByPlaceholderText('CLAVE'), { target: { value: 'new-1' } });
+    fireEvent.click(screen.getByText('Crear'));
+    await waitFor(() => expect(mutations.CreateProject).toHaveBeenCalledWith({
+      variables: { input: { workspaceId: 'workspace-1', name: 'Nuevo', key: 'NEW1', description: '' } },
+    }));
+
+    fireEvent.change(screen.getByLabelText('Email del nuevo miembro'), { target: { value: 'member@example.com' } });
+    fireEvent.click(screen.getByText('Invitar'));
+    await waitFor(() => expect(mutations.AddWorkspaceMember).toHaveBeenCalledWith({
+      variables: { input: { workspaceId: 'workspace-1', email: 'member@example.com' } },
+    }));
+  });
+
+  it('creates an issue from the modal sending numeric type and priority', async () => {
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    renderApp();
+    await selectProject();
+
+    fireEvent.click(screen.getByTestId('btn-create-issue'));
+    fireEvent.change(screen.getByTestId('input-issue-title'), { target: { value: 'Corregir login' } });
+    fireEvent.change(screen.getByTestId('select-issue-type'), { target: { value: 'BUG' } });
+    fireEvent.change(screen.getByTestId('select-issue-priority'), { target: { value: 'CRITICAL' } });
+    fireEvent.click(screen.getByTestId('btn-submit-issue'));
+
+    await waitFor(() => expect(mutations.CreateIssue).toHaveBeenCalled());
+    expect(mutations.CreateIssue.mock.calls[0][0].variables.input).toMatchObject({
+      projectId: 'project-1', title: 'Corregir login', type: 3, priority: 4,
+    });
+  });
+
+  it('asks the AI to segment a task and to improve a story from the issue modal', async () => {
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    renderApp();
+    await selectProject();
+
+    fireEvent.click(screen.getByTestId('btn-create-issue'));
+    fireEvent.change(screen.getByTestId('input-issue-title'), { target: { value: 'Pagos' } });
+    fireEvent.click(screen.getByText('Sugerir criterios y estimación con IA'));
+    await waitFor(() => expect(mutations.AiImproveStory).toHaveBeenCalledWith({
+      variables: { input: { title: 'Pagos', description: '', type: 'STORY', projectId: 'project-1' } },
+    }));
+
+    fireEvent.click(screen.getByText('Segmentar en subtareas con IA'));
+    await waitFor(() => expect(mutations.AiBreakdownTask).toHaveBeenCalledWith({
+      variables: { input: { title: 'Pagos', description: '', projectId: 'project-1' } },
+    }));
+  });
+
+  it('assigns an issue to a sprint and starts and completes sprints', async () => {
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    renderApp();
+    await selectProject();
+
+    fireEvent.change(screen.getByLabelText('Sprint de PLAT-1'), { target: { value: 'sprint-2' } });
+    await waitFor(() => expect(mutations.AssignIssuesToSprint).toHaveBeenCalledWith({
+      variables: { input: { issueIds: ['issue-1'], sprintId: 'sprint-2' } },
+    }));
+
+    fireEvent.click(screen.getByTestId('tab-timeline'));
+    fireEvent.click(screen.getByText('Iniciar sprint'));
+    await waitFor(() => expect(mutations.StartSprint).toHaveBeenCalledWith({ variables: { id: 'sprint-2' } }));
+    fireEvent.click(screen.getByText('Completar sprint'));
+    await waitFor(() => expect(mutations.CompleteSprint).toHaveBeenCalledWith({ variables: { id: 'sprint-1' } }));
+  });
+
+  it('shows mutation errors in the alert banner and clears the session on logout', async () => {
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    renderApp();
+    await selectProject();
+    mutations.UpdateIssueStatus.mockRejectedValueOnce(new Error('Transición no permitida'));
+
+    fireEvent.click(screen.getByTestId('tab-board'));
+    fireEvent.click(screen.getByTestId('btn-advance-PLAT-1'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Transición no permitida');
+    fireEvent.click(screen.getByText('Reintentar'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Salir'));
+    expect(await screen.findByText('Bienvenido de nuevo')).toBeInTheDocument();
+    expect(window.localStorage.getItem('jira-ai-token')).toBeNull();
   });
 
   it('creates AI-suggested stories keeping their type and priority', async () => {

@@ -109,28 +109,6 @@ export const GET_BACKLOG = gql`
   }
 `;
 
-export const GET_SPRINT_BOARD = gql`
-  query GetSprintBoard($projectId: String!, $sprintId: String) {
-    listIssues(projectId: $projectId, sprintId: $sprintId) {
-      id
-      key
-      title
-      status
-      priority
-      storyPoints
-      assigneeId
-    }
-    listSprints(projectId: $projectId) {
-      id
-      name
-      goal
-      status
-      totalStoryPoints
-      completedStoryPoints
-    }
-  }
-`;
-
 export const GET_BURNDOWN_ANALYTICS = gql`
   query GetBurndownAnalytics($sprintId: String!) {
     getBurndownAnalytics(sprintId: $sprintId) {
@@ -215,17 +193,6 @@ export const AI_IMPROVE_STORY = gql`
       reasoning
       complexityFactors
       acceptanceCriteriaGherkin
-    }
-  }
-`;
-
-export const AI_PLAN_SPRINT = gql`
-  mutation AiPlanSprint($input: PlanSprintInput!) {
-    aiPlanSprint(input: $input) {
-      sprintGoal
-      allocatedStoryPoints
-      recommendedIssueIds
-      riskAssessment
     }
   }
 `;

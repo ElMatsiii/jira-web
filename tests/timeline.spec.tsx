@@ -34,6 +34,19 @@ describe('TimelinePage', () => {
     expect(onCompleteSprint).toHaveBeenCalledWith('active');
   });
 
+  it('keeps the form values and re-enables submit when sprint creation fails', async () => {
+    const onCreateSprint = jest.fn().mockRejectedValue(new Error('Fechas inválidas'));
+    render(
+      <TimelinePage loading={false} sprints={[]} onCreateSprint={onCreateSprint} onStartSprint={jest.fn()} onCompleteSprint={jest.fn()} />,
+    );
+    fireEvent.change(screen.getByPlaceholderText('Sprint 1'), { target: { value: 'Sprint roto' } });
+    fireEvent.click(screen.getByText('Crear sprint'));
+
+    await waitFor(() => expect(onCreateSprint).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText('Crear sprint')).not.toBeDisabled());
+    expect(screen.getByPlaceholderText('Sprint 1')).toHaveValue('Sprint roto');
+  });
+
   it('shows loading and empty states', () => {
     const handlers = { onCreateSprint: jest.fn(), onStartSprint: jest.fn(), onCompleteSprint: jest.fn() };
     const { rerender } = render(<TimelinePage loading sprints={[]} {...handlers} />);
