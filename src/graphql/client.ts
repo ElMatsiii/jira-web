@@ -170,6 +170,7 @@ export const AI_DECOMPOSE_EPIC = gql`
         title
         description
         type
+        priority
         estimatedStoryPoints
         acceptanceCriteriaGherkin
       }

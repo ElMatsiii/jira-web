@@ -286,6 +286,26 @@ describe('Web Components Suite', () => {
       });
     });
 
+    it('shows the AI-suggested priority of each story, defaulting to MEDIUM', async () => {
+      const onDecomposeEpic = jest.fn().mockResolvedValue({
+        epicTitle: 'Pagos',
+        stories: [
+          { title: 'Pasarela', description: 'd', type: 'STORY', priority: 'CRITICAL', estimatedStoryPoints: 8, acceptanceCriteriaGherkin: 'g' },
+          { title: 'Reintentos', description: 'd', type: 'TASK', estimatedStoryPoints: 2, acceptanceCriteriaGherkin: 'g' },
+        ],
+      });
+      render(<AIAssistantDrawer isOpen={true} onClose={jest.fn()} onDecomposeEpic={onDecomposeEpic} />);
+
+      fireEvent.change(screen.getByTestId('input-ai-epic-title'), { target: { value: 'Pagos' } });
+      fireEvent.click(screen.getByTestId('btn-ai-decompose-submit'));
+
+      const critical = await screen.findByTestId('ai-story-priority-0');
+      expect(critical).toHaveTextContent('CRITICAL');
+      expect(critical).toHaveClass('priority-critical');
+      expect(screen.getByTestId('ai-story-priority-1')).toHaveTextContent('MEDIUM');
+      expect(screen.getByTestId('ai-story-priority-1')).toHaveClass('priority-medium');
+    });
+
     it('should display error message if AI decomposition fails', async () => {
       const onDecomposeEpic = jest.fn().mockRejectedValue(new Error('Conexión fallida'));
 

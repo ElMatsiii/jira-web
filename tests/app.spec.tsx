@@ -276,3 +276,12 @@ describe('App', () => {
     expect(createIssueMock.mock.calls[1][0].variables.input).toMatchObject({ type: 4, priority: 2, storyPoints: 8 });
   });
 });
+
+describe('AI_DECOMPOSE_EPIC operation', () => {
+  it('requests the suggested priority of each story so it reaches createIssue', () => {
+    const { AI_DECOMPOSE_EPIC } = jest.requireActual('../src/graphql/client');
+    const printed: string = AI_DECOMPOSE_EPIC.loc.source.body;
+    const storiesSelection = printed.slice(printed.indexOf('stories {'));
+    expect(storiesSelection).toMatch(/\bpriority\b/);
+  });
+});

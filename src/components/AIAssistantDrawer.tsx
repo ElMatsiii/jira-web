@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { normalizePriority } from '../utils/issue-utils';
 
 export interface AIAssistantDrawerProps {
   isOpen: boolean;
@@ -208,7 +209,16 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
               <div key={idx} style={{ background: '#16161a', borderRadius: 'var(--radius-sm)', padding: '12px', marginBottom: '10px', border: '1px solid var(--border-color)', borderLeft: '3px solid var(--color-accent)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                   <strong style={{ fontSize: '0.85rem', color: 'var(--text-main)' }}>{story.title}</strong>
-                  <span className="points-pill">{story.estimatedStoryPoints} SP</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <span
+                      className={`priority-${normalizePriority(story.priority).toLowerCase()}`}
+                      title={`Prioridad sugerida: ${normalizePriority(story.priority)}`}
+                      data-testid={`ai-story-priority-${idx}`}
+                    >
+                      ● {normalizePriority(story.priority)}
+                    </span>
+                    <span className="points-pill">{story.estimatedStoryPoints} SP</span>
+                  </span>
                 </div>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '6px 0', lineHeight: 1.4 }}>
                   {story.description}
