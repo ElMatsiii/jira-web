@@ -268,19 +268,19 @@ export const App: React.FC = () => {
     title: string;
     description: string;
     type: string;
+    priority?: string;
     estimatedStoryPoints: number;
     acceptanceCriteriaGherkin: string;
   }) => runAction(async () => {
-    const type = story.type === 'TASK' ? 2 : 1;
     await createIssue({
       variables: {
         input: {
           projectId,
           title: story.title,
           description: story.description,
-          type,
-          priority: 2,
-          storyPoints: story.estimatedStoryPoints,
+          type: typeToId(story.type),
+          priority: priorityToId(story.priority),
+          storyPoints: Number(story.estimatedStoryPoints) || 0,
           acceptanceCriteria: story.acceptanceCriteriaGherkin,
         },
       },

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ApolloProvider } from '@apollo/client';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { App } from '../src/App';
 import { createApolloClient } from '../src/graphql/client';
 
@@ -122,5 +122,48 @@ describe('App', () => {
 
     fireEvent.click(screen.getByTestId('tab-analytics'));
     expect(screen.getByTestId('page-analytics')).toBeInTheDocument();
+  });
+
+  it('creates AI-suggested stories keeping their type and priority', async () => {
+    const createIssueMock = jest.fn().mockResolvedValue({ data: { createIssue: { id: 'issue-9' } } });
+    const defaultUseMutation = apolloMocks.useMutation.getMockImplementation()!;
+    apolloMocks.useMutation.mockImplementation((mutation: any) => {
+      const name = mutation.definitions.find((d: any) => d.kind === 'OperationDefinition')?.name?.value;
+      if (name === 'CreateIssue') return [createIssueMock, { loading: false, error: undefined }];
+      if (name === 'AiDecomposeEpic') {
+        return [jest.fn().mockResolvedValue({
+          data: {
+            aiDecomposeEpic: {
+              epicTitle: 'Pagos',
+              stories: [
+                { title: 'Fallo en webhook', description: 'Bug', type: 'BUG', priority: 'HIGH', estimatedStoryPoints: 2, acceptanceCriteriaGherkin: 'Given' },
+                { title: 'Épica hija', description: 'Epic', type: 'EPIC', estimatedStoryPoints: '8', acceptanceCriteriaGherkin: 'Given' },
+              ],
+            },
+          },
+        }), { loading: false, error: undefined }];
+      }
+      return defaultUseMutation(mutation);
+    });
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    render(
+      <ApolloProvider client={createApolloClient('http://localhost/graphql')}>
+        <App />
+      </ApolloProvider>,
+    );
+
+    fireEvent.change(await screen.findByLabelText('Proyecto'), { target: { value: 'project-1' } });
+    fireEvent.click(screen.getByTestId('btn-ai-assistant'));
+    fireEvent.change(screen.getByTestId('input-ai-epic-title'), { target: { value: 'Pagos' } });
+    fireEvent.click(screen.getByTestId('btn-ai-decompose-submit'));
+
+    const createButtons = await screen.findAllByText('Crear historia');
+    fireEvent.click(createButtons[0]);
+    await waitFor(() => expect(createIssueMock).toHaveBeenCalledTimes(1));
+    fireEvent.click(createButtons[1]);
+    await waitFor(() => expect(createIssueMock).toHaveBeenCalledTimes(2));
+
+    expect(createIssueMock.mock.calls[0][0].variables.input).toMatchObject({ type: 3, priority: 3, storyPoints: 2 });
+    expect(createIssueMock.mock.calls[1][0].variables.input).toMatchObject({ type: 4, priority: 2, storyPoints: 8 });
   });
 });

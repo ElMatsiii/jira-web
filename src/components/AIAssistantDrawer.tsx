@@ -8,6 +8,7 @@ export interface AIAssistantDrawerProps {
     title: string;
     description: string;
     type: string;
+    priority?: string;
     estimatedStoryPoints: number;
     acceptanceCriteriaGherkin: string;
   }) => Promise<void>;
