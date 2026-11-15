@@ -40,7 +40,8 @@ export interface CreateIssueModalProps {
   }>;
 }
 
-const MAX_DRAFTS = 6;
+/** Up to two full rows of four cards on wide screens (auto-fill grid). */
+export const MAX_DRAFTS = 8;
 
 const createInitialDraft = (): IssueDraft => ({
   id: `draft-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -97,7 +98,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
 
   const handleAddBlankDraft = () => {
     if (drafts.length >= MAX_DRAFTS) {
-      setError(`Límite alcanzado: máximo ${MAX_DRAFTS} recuadros simultáneos en el grid.`);
+      setError(`Límite alcanzado: máximo ${MAX_DRAFTS} recuadros simultáneos.`);
       return;
     }
     const newDraft: IssueDraft = {
@@ -157,42 +158,22 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
       setError('Ingresa un título para que la IA genere subtareas complementarias.');
       return;
     }
+    if (!onBreakdownTask) {
+      setSuggestedSubtasks([]);
+      setError('El asistente de IA no está disponible en este momento. Inténtalo más tarde.');
+      return;
+    }
     setSegmenting(true);
     setError('');
     try {
-      if (onBreakdownTask) {
-        const res = await onBreakdownTask({
-          title: sourceDraft.title,
-          description: sourceDraft.description,
-        });
-        setSuggestedSubtasks(res.subtasks || []);
-      } else {
-        setSuggestedSubtasks([
-          {
-            title: `Crear Frontend para ${sourceDraft.title}`,
-            description: 'Estructurar vistas cliente, componentes reutilizables y estilos.',
-            type: 'TASK',
-            priority: 'HIGH',
-            estimatedStoryPoints: 3,
-            acceptanceCriteriaGherkin: 'Given la interfaz When el usuario interactúa Then responde visualmente',
-          },
-          {
-            title: `Crear Backend y API para ${sourceDraft.title}`,
-            description: 'Servicios de lógica de negocio, endpoints y persistencia de datos.',
-            type: 'TASK',
-            priority: 'HIGH',
-            estimatedStoryPoints: 5,
-            acceptanceCriteriaGherkin: 'Given endpoints activos When se envían peticiones Then retorna estado 200',
-          },
-          {
-            title: `Configurar Base de Datos para ${sourceDraft.title}`,
-            description: 'Esquema de tablas, índices y migraciones de datos.',
-            type: 'TASK',
-            priority: 'MEDIUM',
-            estimatedStoryPoints: 3,
-            acceptanceCriteriaGherkin: 'Given la base conectada When se ejecutan migraciones Then las tablas se configuran',
-          },
-        ]);
+      const res = await onBreakdownTask({
+        title: sourceDraft.title,
+        description: sourceDraft.description,
+      });
+      const subtasks = res?.subtasks || [];
+      setSuggestedSubtasks(subtasks);
+      if (!subtasks.length) {
+        setError('La IA no devolvió subtareas para esta incidencia.');
       }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'No se pudieron generar subtareas.');
@@ -223,7 +204,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
   // Accepting a subtask creates a new draft AND removes it from suggestions to save vertical space
   const handleAcceptSubtask = (st: SuggestedSubtaskItem) => {
     if (drafts.length >= MAX_DRAFTS) {
-      setError(`Límite alcanzado: máximo ${MAX_DRAFTS} recuadros simultáneos en el grid.`);
+      setError(`Límite alcanzado: máximo ${MAX_DRAFTS} recuadros simultáneos.`);
       return;
     }
 
@@ -246,7 +227,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
   const handleAcceptAllSubtasks = () => {
     const availableSlots = MAX_DRAFTS - drafts.length;
     if (availableSlots <= 0) {
-      setError(`Límite alcanzado: máximo ${MAX_DRAFTS} recuadros simultáneos en el grid.`);
+      setError(`Límite alcanzado: máximo ${MAX_DRAFTS} recuadros simultáneos.`);
       return;
     }
 
@@ -271,7 +252,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
 
   const isMultiGrid = drafts.length > 1;
 
-  // Render individual form fields inside a recuadro card
+  // One recuadro: a wide two-column form. Several: cards in a responsive grid (stacked fields).
   const renderCardForm = (draft: IssueDraft, index: number) => {
     const isSubmitting = submittingDraftIds.includes(draft.id);
     const isImproving = improvingDraftId === draft.id;
@@ -281,6 +262,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
       <form
         key={draft.id}
         className="modal-grid-card"
+        data-testid={`issue-draft-card-${index}`}
         onSubmit={(e) => {
           e.preventDefault();
           void handleCreateDraft(draft.id);
@@ -291,21 +273,17 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
           <div className="modal-grid-card-title-badge">
             <span className="modal-grid-card-num">#{index + 1}</span>
             <span className="modal-grid-card-label">
-              {draft.title.trim()
-                ? draft.title.length > 24
-                  ? draft.title.substring(0, 22) + '...'
-                  : draft.title
-                : `Recuadro ${index + 1}`}
+              {draft.title.trim() ? draft.title : `Recuadro ${index + 1}`}
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="modal-grid-card-header-actions">
             <span className="subtask-badge sp">{draft.storyPoints} SP</span>
             {drafts.length > 1 && (
               <button
                 type="button"
                 className="modal-grid-card-close"
-                title="Descartar este recuadro del grid"
+                title="Descartar este recuadro"
                 aria-label={`Descartar recuadro ${index + 1}`}
                 onClick={() => handleCloseDraft(draft.id)}
               >
@@ -315,213 +293,209 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
           </div>
         </div>
 
-        {/* Title Input */}
-        <div className="form-group">
-          <label className="form-label" htmlFor={`issue-title-${draft.id}`}>
-            Título de la Incidencia *
-          </label>
-          <input
-            id={`issue-title-${draft.id}`}
-            className="form-input"
-            type="text"
-            required
-            placeholder="Ej: crear la base del proyecto"
-            value={draft.title}
-            onChange={(e) => updateDraft(draft.id, 'title', e.target.value)}
-            data-testid={isPrimaryCard ? 'input-issue-title' : `input-issue-title-${index}`}
-            autoFocus={isPrimaryCard && !isMultiGrid}
-          />
-        </div>
-
-        {/* AI Actions Row */}
-        <div className="modal-grid-card-actions-row">
-          <button
-            type="button"
-            className="btn btn-ai modal-grid-card-btn-ai"
-            onClick={() => void handleBreakdownTask(draft)}
-            disabled={segmenting || isSubmitting || !draft.title.trim()}
-          >
-            {segmenting ? 'Segmentando...' : 'Segmentar en subtareas con IA'}
-          </button>
-
-          {onImprove && (
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm modal-grid-card-btn-ai"
-              onClick={() => void handleImprove(draft)}
-              disabled={isImproving || isSubmitting || !draft.title.trim()}
-            >
-              {isImproving ? 'Estimando...' : 'Sugerir criterios y estimación con IA'}
-            </button>
-          )}
-        </div>
-
-        {/* AI Subtasks Tray: Only renders pending unaccepted suggestions */}
-        {suggestedSubtasks.length > 0 && isPrimaryCard && (
-          <div className="subtask-tray" style={{ maxHeight: isMultiGrid ? '160px' : '260px', overflowY: 'auto' }}>
-            <div className="subtask-tray-title">
-              <span>Sugerencias disponibles ({suggestedSubtasks.length}):</span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                {drafts.length < MAX_DRAFTS && (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-secondary"
-                    style={{ fontSize: '0.68rem', padding: '1px 6px' }}
-                    onClick={handleAcceptAllSubtasks}
-                  >
-                    + Añadir todas ({Math.min(suggestedSubtasks.length, MAX_DRAFTS - drafts.length)})
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-sm btn-secondary"
-                  style={{ fontSize: '0.68rem', padding: '1px 5px' }}
-                  title="Ocultar bandeja de sugerencias"
-                  onClick={() => setSuggestedSubtasks([])}
-                >
-                  ×
-                </button>
-              </div>
+        <div className="issue-form-layout" data-testid={isPrimaryCard ? 'issue-form-layout' : undefined}>
+          <div className="issue-form-main">
+            {/* Title Input */}
+            <div className="form-group">
+              <label className="form-label" htmlFor={`issue-title-${draft.id}`}>
+                Título de la Incidencia *
+              </label>
+              <input
+                id={`issue-title-${draft.id}`}
+                className="form-input"
+                type="text"
+                required
+                placeholder="Ej: crear la base del proyecto"
+                value={draft.title}
+                onChange={(e) => updateDraft(draft.id, 'title', e.target.value)}
+                data-testid={isPrimaryCard ? 'input-issue-title' : `input-issue-title-${index}`}
+                autoFocus={isPrimaryCard && !isMultiGrid}
+              />
             </div>
 
-            <div className="subtask-card-list">
-              {suggestedSubtasks.map((st, i) => (
-                <div
-                  key={i}
-                  className="subtask-card-item"
-                  onClick={() => {
-                    if (drafts.length < MAX_DRAFTS) {
-                      handleAcceptSubtask(st);
-                    }
-                  }}
-                  title="Haz clic para abrir este recuadro en el grid"
+            {/* AI Actions Row */}
+            <div className="modal-grid-card-actions-row">
+              <button
+                type="button"
+                className="btn btn-ai btn-sm"
+                onClick={() => void handleBreakdownTask(draft)}
+                disabled={segmenting || isSubmitting || !draft.title.trim()}
+              >
+                {segmenting ? 'Segmentando...' : 'Segmentar en subtareas con IA'}
+              </button>
+
+              {onImprove && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => void handleImprove(draft)}
+                  disabled={isImproving || isSubmitting || !draft.title.trim()}
                 >
-                  <div className="subtask-card-header-row">
-                    <div className="subtask-card-title">{st.title}</div>
-                    <div className="subtask-card-badges">
-                      <span className="subtask-badge sp">{st.estimatedStoryPoints || 3} SP</span>
-                      <span className="subtask-badge">{st.type || 'TASK'}</span>
-                      <span className="subtask-badge high">{st.priority || 'MEDIUM'}</span>
-                    </div>
-                  </div>
+                  {isImproving ? 'Estimando...' : 'Sugerir criterios y estimación con IA'}
+                </button>
+              )}
+            </div>
 
-                  <div className="subtask-card-desc">{st.description}</div>
-
-                  <div className="subtask-card-footer-row">
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                      Clic para añadir al Grid simultáneo
-                    </span>
+            {/* AI Subtasks Tray: Only renders pending unaccepted suggestions */}
+            {suggestedSubtasks.length > 0 && isPrimaryCard && (
+              <div className="subtask-tray">
+                <div className="subtask-tray-title">
+                  <span>Sugerencias disponibles ({suggestedSubtasks.length}):</span>
+                  <div className="subtask-tray-actions">
+                    {drafts.length < MAX_DRAFTS && (
+                      <button type="button" className="btn btn-sm btn-secondary" onClick={handleAcceptAllSubtasks}>
+                        + Añadir todas ({Math.min(suggestedSubtasks.length, MAX_DRAFTS - drafts.length)})
+                      </button>
+                    )}
                     <button
                       type="button"
-                      className="btn-open-recuadro"
-                      disabled={drafts.length >= MAX_DRAFTS}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAcceptSubtask(st);
-                      }}
+                      className="btn btn-sm btn-secondary"
+                      title="Ocultar bandeja de sugerencias"
+                      aria-label="Ocultar sugerencias"
+                      onClick={() => setSuggestedSubtasks([])}
                     >
-                      + Abrir recuadro
+                      ×
                     </button>
                   </div>
                 </div>
+
+                <div className="subtask-card-list">
+                  {suggestedSubtasks.map((st, i) => (
+                    <div
+                      key={i}
+                      className="subtask-card-item"
+                      onClick={() => {
+                        if (drafts.length < MAX_DRAFTS) {
+                          handleAcceptSubtask(st);
+                        }
+                      }}
+                      title="Haz clic para abrir esta subtarea en un nuevo recuadro"
+                    >
+                      <div className="subtask-card-header-row">
+                        <div className="subtask-card-title">{st.title}</div>
+                        <div className="subtask-card-badges">
+                          <span className="subtask-badge sp">{st.estimatedStoryPoints || 3} SP</span>
+                          <span className="subtask-badge">{st.type || 'TASK'}</span>
+                          <span className="subtask-badge high">{st.priority || 'MEDIUM'}</span>
+                        </div>
+                      </div>
+
+                      <div className="subtask-card-desc">{st.description}</div>
+
+                      <div className="subtask-card-footer-row">
+                        <span className="subtask-card-hint">Clic para abrirla en un nuevo recuadro</span>
+                        <button
+                          type="button"
+                          className="btn-open-recuadro"
+                          disabled={drafts.length >= MAX_DRAFTS}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAcceptSubtask(st);
+                          }}
+                        >
+                          + Abrir recuadro
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Description */}
+            <div className="form-group">
+              <label className="form-label" htmlFor={`issue-desc-${draft.id}`}>
+                Descripción
+              </label>
+              <textarea
+                id={`issue-desc-${draft.id}`}
+                className="form-textarea"
+                rows={isMultiGrid ? 2 : 4}
+                placeholder="Detalles técnicos o funcionales..."
+                value={draft.description}
+                onChange={(e) => updateDraft(draft.id, 'description', e.target.value)}
+                data-testid={isPrimaryCard ? 'input-issue-desc' : `input-issue-desc-${index}`}
+              />
+            </div>
+
+            {/* Acceptance Criteria */}
+            <div className="form-group">
+              <label className="form-label" htmlFor={`issue-acceptance-${draft.id}`}>
+                Criterios de aceptación
+              </label>
+              <textarea
+                id={`issue-acceptance-${draft.id}`}
+                className="form-textarea"
+                rows={isMultiGrid ? 2 : 5}
+                placeholder="¿Cómo sabremos que esta historia o subtarea está terminada?"
+                value={draft.acceptanceCriteria}
+                onChange={(e) => updateDraft(draft.id, 'acceptanceCriteria', e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="issue-form-side">
+            <div className="form-group">
+              <label className="form-label" htmlFor={`issue-type-${draft.id}`}>Tipo</label>
+              <select
+                id={`issue-type-${draft.id}`}
+                className="form-select"
+                value={draft.type}
+                onChange={(e) => updateDraft(draft.id, 'type', e.target.value)}
+                data-testid={isPrimaryCard ? 'select-issue-type' : `select-issue-type-${index}`}
+              >
+                <option value="STORY">Historia</option>
+                <option value="TASK">Tarea</option>
+                <option value="BUG">Bug</option>
+                <option value="EPIC">Epic</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor={`issue-priority-${draft.id}`}>Prioridad</label>
+              <select
+                id={`issue-priority-${draft.id}`}
+                className="form-select"
+                value={draft.priority}
+                onChange={(e) => updateDraft(draft.id, 'priority', e.target.value)}
+                data-testid={isPrimaryCard ? 'select-issue-priority' : `select-issue-priority-${index}`}
+              >
+                <option value="LOW">Baja</option>
+                <option value="MEDIUM">Media</option>
+                <option value="HIGH">Alta</option>
+                <option value="CRITICAL">Crítica</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor={`issue-points-${draft.id}`}>Story Points</label>
+              <input
+                id={`issue-points-${draft.id}`}
+                className="form-input"
+                type="number"
+                min="0"
+                max="100"
+                value={draft.storyPoints}
+                onChange={(e) => updateDraft(draft.id, 'storyPoints', parseInt(e.target.value, 10) || 0)}
+                data-testid={isPrimaryCard ? 'input-issue-points' : `input-issue-points-${index}`}
+              />
+            </div>
+
+            {/* Fibonacci Quick Chips */}
+            <div className="modal-grid-card-fibonacci">
+              <span className="modal-grid-card-fibonacci-label">Fibonacci:</span>
+              {[1, 2, 3, 5, 8, 13].map((pts) => (
+                <button
+                  key={pts}
+                  type="button"
+                  className={`btn btn-sm ${draft.storyPoints === pts ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => updateDraft(draft.id, 'storyPoints', pts)}
+                >
+                  {pts}
+                </button>
               ))}
             </div>
           </div>
-        )}
-
-        {/* Acceptance Criteria */}
-        <div className="form-group">
-          <label className="form-label" htmlFor={`issue-acceptance-${draft.id}`}>
-            Criterios de aceptación
-          </label>
-          <textarea
-            id={`issue-acceptance-${draft.id}`}
-            className="form-textarea"
-            rows={1}
-            placeholder="¿Cómo sabremos que esta historia o subtarea está terminada?"
-            value={draft.acceptanceCriteria}
-            onChange={(e) => updateDraft(draft.id, 'acceptanceCriteria', e.target.value)}
-          />
-        </div>
-
-        {/* Description */}
-        <div className="form-group">
-          <label className="form-label" htmlFor={`issue-desc-${draft.id}`}>
-            Descripción
-          </label>
-          <textarea
-            id={`issue-desc-${draft.id}`}
-            className="form-textarea"
-            rows={1}
-            placeholder="Detalles técnicos o funcionales..."
-            value={draft.description}
-            onChange={(e) => updateDraft(draft.id, 'description', e.target.value)}
-            data-testid={isPrimaryCard ? 'input-issue-desc' : `input-issue-desc-${index}`}
-          />
-        </div>
-
-        {/* Row: Type, Priority, Story Points */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
-          <div className="form-group">
-            <label className="form-label" htmlFor={`issue-type-${draft.id}`}>Tipo</label>
-            <select
-              id={`issue-type-${draft.id}`}
-              className="form-select"
-              value={draft.type}
-              onChange={(e) => updateDraft(draft.id, 'type', e.target.value)}
-              data-testid={isPrimaryCard ? 'select-issue-type' : `select-issue-type-${index}`}
-            >
-              <option value="STORY">Historia</option>
-              <option value="TASK">Tarea</option>
-              <option value="BUG">Bug</option>
-              <option value="EPIC">Epic</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor={`issue-priority-${draft.id}`}>Prioridad</label>
-            <select
-              id={`issue-priority-${draft.id}`}
-              className="form-select"
-              value={draft.priority}
-              onChange={(e) => updateDraft(draft.id, 'priority', e.target.value)}
-              data-testid={isPrimaryCard ? 'select-issue-priority' : `select-issue-priority-${index}`}
-            >
-              <option value="LOW">Baja</option>
-              <option value="MEDIUM">Media</option>
-              <option value="HIGH">Alta</option>
-              <option value="CRITICAL">Crítica</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor={`issue-points-${draft.id}`}>Story Points</label>
-            <input
-              id={`issue-points-${draft.id}`}
-              className="form-input"
-              type="number"
-              min="0"
-              max="100"
-              value={draft.storyPoints}
-              onChange={(e) => updateDraft(draft.id, 'storyPoints', parseInt(e.target.value, 10) || 0)}
-              data-testid={isPrimaryCard ? 'input-issue-points' : `input-issue-points-${index}`}
-            />
-          </div>
-        </div>
-
-        {/* Fibonacci Quick Chips */}
-        <div className="modal-grid-card-fibonacci">
-          <span style={{ fontSize: '0.68rem', color: 'var(--text-subtle)', marginRight: '2px' }}>Fibonacci:</span>
-          {[1, 2, 3, 5, 8, 13].map((pts) => (
-            <button
-              key={pts}
-              type="button"
-              className={`btn btn-sm ${draft.storyPoints === pts ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => updateDraft(draft.id, 'storyPoints', pts)}
-            >
-              {pts}
-            </button>
-          ))}
         </div>
 
         {/* Card Footer Actions */}
@@ -548,123 +522,60 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
   };
 
   return (
-    <div
-      className={`modal-overlay ${isMultiGrid ? 'grid-mode' : ''}`}
-      role="dialog"
-      aria-modal="true"
-      data-testid="create-issue-modal"
-    >
-      {/* 1 CARD MODE: Centered on Screen */}
-      {!isMultiGrid && (
-        <div className="modal-card">
-          {/* Header Banner */}
-          <div className="modal-header">
+    <div className="modal-overlay create-issue-overlay" data-testid="create-issue-modal">
+      <div
+        className={`create-issue-dialog ${isMultiGrid ? 'is-multi' : 'is-single'}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-issue-heading"
+        data-testid="create-issue-dialog"
+      >
+        <header className="create-issue-header">
+          <div className="create-issue-heading-group">
             <div>
-              <h2>Crear Nueva Incidencia</h2>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+              <h2 id="create-issue-heading" className="create-issue-title">Crear Nueva Incidencia</h2>
+              <p className="create-issue-subtitle">
                 Registrada en el Microservicio MS1 (Go + PostgreSQL) vía GraphQL BFF
               </p>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span className="modal-grid-counter-badge">
-                1 / {MAX_DRAFTS} recuadros
-              </span>
-              <button className="btn btn-secondary btn-sm" onClick={onClose} aria-label="Cerrar modal">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
+            <span className={`modal-grid-counter-badge ${drafts.length >= MAX_DRAFTS ? 'limit' : ''}`}>
+              {drafts.length} / {MAX_DRAFTS} recuadros
+            </span>
           </div>
 
-          {/* Quick bar to add new blank recuadro */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
-            <button
-              type="button"
-              className="modal-deck-add-btn"
-              onClick={handleAddBlankDraft}
-              title="Abrir un segundo recuadro simultáneo en grid 3x2"
-            >
-              + Nuevo recuadro (1/{MAX_DRAFTS})
+          <div className="create-issue-header-actions">
+            {drafts.length < MAX_DRAFTS && (
+              <button
+                type="button"
+                className="modal-deck-add-btn"
+                onClick={handleAddBlankDraft}
+                title="Abrir otro recuadro para crear varias incidencias a la vez"
+              >
+                + Nuevo recuadro ({drafts.length}/{MAX_DRAFTS})
+              </button>
+            )}
+            <button type="button" className="btn btn-secondary btn-sm create-issue-close" onClick={onClose} aria-label="Cerrar modal">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
             </button>
           </div>
+        </header>
 
-          {error && <div className="form-error" role="alert" style={{ marginBottom: '10px' }}>{error}</div>}
+        {error && <div className="form-error create-issue-error" role="alert">{error}</div>}
 
-          {/* Render the single centered card */}
-          {renderCardForm(drafts[0], 0)}
-        </div>
-      )}
-
-      {/* MULTI-CARD MODE (2 to 6 CARDS): SIMULTANEOUS 3x2 GRID */}
-      {isMultiGrid && (() => {
-        const isMultiRow = drafts.length > 3;
-        const cols = drafts.length === 2 ? 2 : 3;
-        const rows = isMultiRow ? 2 : 1;
-        return (
-          <div
-            style={{
-              width: '100%',
-              maxWidth: '1560px',
-              margin: '0 auto',
-              display: 'flex',
-              flexDirection: 'column',
-              height: isMultiRow ? '100%' : 'auto',
-              maxHeight: '100%',
-            }}
-          >
-            {/* Top Sticky Bar */}
-            <div className="modal-grid-top-bar">
-              <div className="modal-grid-top-left">
-                <div>
-                  <h2 className="modal-grid-top-title">Crear Nueva Incidencia</h2>
-                  <p className="modal-grid-top-subtitle">
-                    Vista simultánea en Grid 3x2 — Microservicio MS1 (Go + PostgreSQL)
-                  </p>
-                </div>
-                <span
-                  className={`modal-grid-counter-badge ${drafts.length >= MAX_DRAFTS ? 'limit' : ''}`}
-                >
-                  {drafts.length} / {MAX_DRAFTS} recuadros simultáneos
-                </span>
-              </div>
-
-              <div className="modal-grid-top-actions">
-                {drafts.length < MAX_DRAFTS && (
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={handleAddBlankDraft}
-                    title="Abrir un nuevo recuadro en el grid"
-                  >
-                    + Nuevo recuadro ({drafts.length}/{MAX_DRAFTS})
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={onClose}
-                  aria-label="Cerrar modal"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <div className="form-error" role="alert" style={{ marginBottom: '8px', maxWidth: '1560px' }}>
-                {error}
-              </div>
-            )}
-
-            {/* 3x2 Grid Cards Container: strictly bounded to viewport without scroll */}
-            <div className={`modal-grid-container cols-${cols} rows-${rows}`}>
+        {/* Scrolls vertically inside the dialog; the header stays visible. */}
+        <div className="create-issue-body" data-testid="create-issue-body">
+          {isMultiGrid ? (
+            <div className="create-issue-grid" data-testid="create-issue-grid">
               {drafts.map((draft, idx) => renderCardForm(draft, idx))}
             </div>
-          </div>
-        );
-      })()}
+          ) : (
+            renderCardForm(drafts[0], 0)
+          )}
+        </div>
+      </div>
     </div>
   );
 };

@@ -102,7 +102,7 @@ describe('Web Components Suite', () => {
       expect(onClose).toHaveBeenCalledTimes(2);
     });
 
-    it('should allow AI segmentation and opening a second customizable recuadro up to maximum 6', async () => {
+    it('should allow AI segmentation and opening a second customizable recuadro up to maximum 8', async () => {
       const onBreakdownTask = jest.fn().mockResolvedValue({
         parentTitle: 'crear la base de la pagina web',
         subtasks: [
@@ -156,20 +156,49 @@ describe('Web Components Suite', () => {
       fireEvent.click(openButtons[0]);
 
       // Now we should have 2 recuadros active simultaneously in the grid
-      expect(screen.getByText(/2 \/ 6 recuadros/)).toBeInTheDocument();
+      expect(screen.getByText(/2 \/ 8 recuadros/)).toBeInTheDocument();
       // Both the original card and the new accepted card are simultaneously visible in the grid
       expect(screen.getByDisplayValue('crear la base de la pagina web')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Crear frontend base')).toBeInTheDocument();
 
-      // Add blank drafts until reaching max 6
-      for (let i = 2; i < 6; i++) {
-        const addBtn = screen.getByText(new RegExp(`\\+ Nuevo recuadro \\(${i}/6\\)`));
+      // Add blank drafts until reaching max 8
+      for (let i = 2; i < 8; i++) {
+        const addBtn = screen.getByText(new RegExp(`\\+ Nuevo recuadro \\(${i}/8\\)`));
         fireEvent.click(addBtn);
       }
-      expect(screen.getByText(/6 \/ 6 recuadros/)).toBeInTheDocument();
+      expect(screen.getByText(/8 \/ 8 recuadros/)).toBeInTheDocument();
 
-      // Attempting to add beyond 6 is blocked
+      // Attempting to add beyond 8 is blocked
       expect(screen.queryByText(/\+ Nuevo recuadro/)).not.toBeInTheDocument();
+    });
+
+    it('shows an unavailable message instead of invented subtasks when there is no AI backend', () => {
+      render(<CreateIssueModal isOpen={true} onClose={jest.fn()} onCreate={jest.fn()} />);
+      fireEvent.change(screen.getByTestId('input-issue-title'), { target: { value: 'Pagos' } });
+      fireEvent.click(screen.getByText('Segmentar en subtareas con IA'));
+
+      expect(screen.getByText(/El asistente de IA no está disponible/)).toBeInTheDocument();
+      expect(screen.queryByText(/Crear Frontend para/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Sugerencias disponibles/)).not.toBeInTheDocument();
+    });
+
+    it('tells the user when the AI returns no subtasks', async () => {
+      const onBreakdownTask = jest.fn().mockResolvedValue({ parentTitle: 'Pagos', subtasks: [] });
+      render(<CreateIssueModal isOpen={true} onClose={jest.fn()} onCreate={jest.fn()} onBreakdownTask={onBreakdownTask} />);
+      fireEvent.change(screen.getByTestId('input-issue-title'), { target: { value: 'Pagos' } });
+      fireEvent.click(screen.getByText('Segmentar en subtareas con IA'));
+
+      expect(await screen.findByText('La IA no devolvió subtareas para esta incidencia.')).toBeInTheDocument();
+      expect(screen.queryByText(/Sugerencias disponibles/)).not.toBeInTheDocument();
+    });
+
+    it('shows the AI error message when segmentation fails', async () => {
+      const onBreakdownTask = jest.fn().mockRejectedValue(new Error('Agente caído'));
+      render(<CreateIssueModal isOpen={true} onClose={jest.fn()} onCreate={jest.fn()} onBreakdownTask={onBreakdownTask} />);
+      fireEvent.change(screen.getByTestId('input-issue-title'), { target: { value: 'Pagos' } });
+      fireEvent.click(screen.getByText('Segmentar en subtareas con IA'));
+
+      expect(await screen.findByText('Agente caído')).toBeInTheDocument();
     });
   });
 
@@ -179,6 +208,34 @@ describe('Web Components Suite', () => {
         <AIAssistantDrawer isOpen={false} onClose={jest.fn()} onDecomposeEpic={jest.fn()} />
       );
       expect(container.firstChild).toBeNull();
+    });
+
+    it('closes when clicking the backdrop or the close button, but not when clicking inside the panel', () => {
+      const onClose = jest.fn();
+      render(<AIAssistantDrawer isOpen={true} onClose={onClose} onDecomposeEpic={jest.fn()} />);
+
+      expect(screen.getByRole('dialog', { name: 'Asistente Scrum Master IA' })).toHaveAttribute('aria-modal', 'true');
+
+      fireEvent.click(screen.getByTestId('ai-drawer'));
+      fireEvent.click(screen.getByTestId('input-ai-epic-title'));
+      fireEvent.click(screen.getByText('Desglosar una épica'));
+      expect(onClose).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByTestId('ai-drawer-backdrop'));
+      expect(onClose).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByLabelText('Cerrar panel IA'));
+      expect(onClose).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps the panel interactive: typing in the form does not close it', () => {
+      const onClose = jest.fn();
+      render(<AIAssistantDrawer isOpen={true} onClose={onClose} onDecomposeEpic={jest.fn()} />);
+
+      fireEvent.change(screen.getByTestId('input-ai-epic-desc'), { target: { value: 'Webhooks' } });
+      fireEvent.keyDown(screen.getByTestId('input-ai-epic-desc'), { key: 'Enter' });
+      expect(screen.getByTestId('input-ai-epic-desc')).toHaveValue('Webhooks');
+      expect(onClose).not.toHaveBeenCalled();
     });
 
     it('should populate inputs when clicking a quick suggestion template', () => {
@@ -227,6 +284,26 @@ describe('Web Components Suite', () => {
         expect(screen.getByText('Configurar Webhooks')).toBeInTheDocument();
         expect(screen.getByText('5 SP')).toBeInTheDocument();
       });
+    });
+
+    it('shows the AI-suggested priority of each story, defaulting to MEDIUM', async () => {
+      const onDecomposeEpic = jest.fn().mockResolvedValue({
+        epicTitle: 'Pagos',
+        stories: [
+          { title: 'Pasarela', description: 'd', type: 'STORY', priority: 'CRITICAL', estimatedStoryPoints: 8, acceptanceCriteriaGherkin: 'g' },
+          { title: 'Reintentos', description: 'd', type: 'TASK', estimatedStoryPoints: 2, acceptanceCriteriaGherkin: 'g' },
+        ],
+      });
+      render(<AIAssistantDrawer isOpen={true} onClose={jest.fn()} onDecomposeEpic={onDecomposeEpic} />);
+
+      fireEvent.change(screen.getByTestId('input-ai-epic-title'), { target: { value: 'Pagos' } });
+      fireEvent.click(screen.getByTestId('btn-ai-decompose-submit'));
+
+      const critical = await screen.findByTestId('ai-story-priority-0');
+      expect(critical).toHaveTextContent('CRITICAL');
+      expect(critical).toHaveClass('priority-critical');
+      expect(screen.getByTestId('ai-story-priority-1')).toHaveTextContent('MEDIUM');
+      expect(screen.getByTestId('ai-story-priority-1')).toHaveClass('priority-medium');
     });
 
     it('should display error message if AI decomposition fails', async () => {

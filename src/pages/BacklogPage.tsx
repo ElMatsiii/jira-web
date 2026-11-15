@@ -7,6 +7,7 @@ import {
   normalizeStatus,
   normalizeType,
 } from '../utils/issue-utils';
+import { groupIssuesByEpic } from '../utils/epic-grouping';
 
 export interface Issue {
   id: string;
@@ -18,7 +19,12 @@ export interface Issue {
   type: IssueType | string | number;
   storyPoints: number;
   sprintId?: string;
+  /** Parent epic, when the issue belongs to one. */
+  parentId?: string;
   acceptanceCriteria?: string;
+  /** Name of who created the issue. */
+  reporterName?: string;
+  createdAt?: string;
 }
 
 export interface BacklogPageProps {
@@ -28,6 +34,8 @@ export interface BacklogPageProps {
   onOpenCreateModal: () => void;
   onOpenAiDrawer: () => void;
   onAssignIssue?: (issueId: string, sprintId: string) => void;
+  /** Opens the detail of an issue (click or Enter on its row). */
+  onSelectIssue?: (issueId: string) => void;
 }
 
 export const BacklogPage: React.FC<BacklogPageProps> = ({
@@ -37,6 +45,7 @@ export const BacklogPage: React.FC<BacklogPageProps> = ({
   onOpenCreateModal,
   onOpenAiDrawer,
   onAssignIssue,
+  onSelectIssue,
 }) => {
   const [filterType, setFilterType] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -53,6 +62,7 @@ export const BacklogPage: React.FC<BacklogPageProps> = ({
   });
 
   const totalPoints = filteredIssues.reduce((acc, curr) => acc + (Number(curr.storyPoints) || 0), 0);
+  const rows = groupIssuesByEpic(filteredIssues, issues);
 
   return (
     <div className="main-content" data-testid="page-backlog">
@@ -191,22 +201,49 @@ export const BacklogPage: React.FC<BacklogPageProps> = ({
             </div>
           </div>
         ) : (
-          filteredIssues.map((issue) => {
+          rows.map(({ issue, nested, childCount, parentKey }) => {
             const normType = normalizeType(issue.type);
             const normPriority = normalizePriority(issue.priority);
             const normStatus = normalizeStatus(issue.status);
             const displayKey = issue.key || 'INC';
             const displayTitle = issue.title || 'Sin título';
             return (
-              <div key={issue.id || displayKey} className="issue-item" data-testid={`issue-row-${displayKey}`}>
+              <div
+                key={issue.id || displayKey}
+                className={`issue-item${nested ? ' is-epic-child' : ''}${onSelectIssue ? ' is-selectable' : ''}`}
+                data-testid={`issue-row-${displayKey}`}
+                {...(onSelectIssue ? {
+                  role: 'button',
+                  tabIndex: 0,
+                  'aria-label': `Ver detalle de ${displayKey}`,
+                  onClick: () => onSelectIssue(issue.id),
+                  onKeyDown: (event: React.KeyboardEvent) => {
+                    if (event.key === 'Enter' && event.target === event.currentTarget) onSelectIssue(issue.id);
+                  },
+                } : {})}
+              >
                 <div className="issue-left">
+                  {nested && <span className="epic-child-marker" aria-hidden="true">↳</span>}
                   <span className="issue-key">{displayKey}</span>
                   <span className={`badge badge-${normType.toLowerCase()}`}>
                     {normType}
                   </span>
                   <span className="issue-title" title={displayTitle}>{displayTitle}</span>
+                  {normType === 'EPIC' && childCount > 0 && (
+                    <span className="epic-child-count" data-testid={`epic-children-${displayKey}`}>
+                      {childCount} {childCount === 1 ? 'historia' : 'historias'}
+                    </span>
+                  )}
+                  {parentKey && (
+                    <span className="epic-parent-chip" title={`Pertenece a la épica ${parentKey}`}>
+                      Épica {parentKey}
+                    </span>
+                  )}
                 </div>
                 <div className="issue-right">
+                  {issue.reporterName && (
+                    <span className="issue-author" title={`Creada por ${issue.reporterName}`}>{issue.reporterName}</span>
+                  )}
                   <span className={`priority-${normPriority.toLowerCase()}`} title={`Prioridad: ${normPriority}`}>
                     ● {normPriority}
                   </span>
@@ -219,6 +256,8 @@ export const BacklogPage: React.FC<BacklogPageProps> = ({
                       className="form-select issue-sprint-select"
                       aria-label={`Sprint de ${displayKey}`}
                       value={issue.sprintId || ''}
+                      // Choosing a sprint must not open the issue detail.
+                      onClick={(event) => event.stopPropagation()}
                       onChange={(event) => {
                         if (event.target.value) onAssignIssue(issue.id, event.target.value);
                       }}

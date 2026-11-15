@@ -1,6 +1,6 @@
 import React from 'react';
 import { ApolloProvider } from '@apollo/client';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { App } from '../src/App';
 import { createApolloClient } from '../src/graphql/client';
 
@@ -18,9 +18,23 @@ const apolloMocks = jest.requireMock('@apollo/client') as {
   useMutation: jest.Mock;
 };
 
+const renderApp = () => render(
+  <ApolloProvider client={createApolloClient('http://localhost/graphql')}>
+    <App />
+  </ApolloProvider>,
+);
+
+const selectProject = async () => {
+  fireEvent.change(await screen.findByLabelText('Proyecto'), { target: { value: 'project-1' } });
+  await screen.findByText('PLAT-1');
+};
+
 describe('App', () => {
+  let mutations: Record<string, jest.Mock>;
+
   beforeEach(() => {
     window.localStorage.clear();
+    mutations = {};
     apolloMocks.useQuery.mockImplementation((query: any) => {
       const operation = query.definitions.find((definition: any) => definition.kind === 'OperationDefinition');
       const name = operation?.name?.value;
@@ -38,9 +52,17 @@ describe('App', () => {
         Me: { me: { id: 'user-1', name: 'Ana', email: 'ana@example.com' }, myWorkspaces: [{ id: 'workspace-1', name: 'Equipo Ana', role: 'OWNER' }] },
         WorkspaceProjects: { workspaceProjects: [project] },
         GetBacklog: { listIssues: [issue] },
-        GetSprints: { listSprints: [sprint] },
+        GetSprints: {
+          listSprints: [sprint, {
+            id: 'sprint-2', name: 'Sprint 2', goal: 'Siguiente', status: 'PLANNED',
+            startDate: '2026-11-16T00:00:00.000Z', endDate: '2026-11-30T23:59:59.000Z',
+            totalStoryPoints: 0, completedStoryPoints: 0,
+          }],
+        },
         GetBurndownAnalytics: { getBurndownAnalytics: { sprintId: 'sprint-1', velocity: 5, idealBurndown: [5, 0], actualBurndown: [5, 2], blockedCount: 0, healthStatus: 'HEALTHY' } },
         ProjectWorkLogs: { projectWorkLogs: { totalHours: 0, entries: [] } },
+        ProjectMembers: { projectMembers: [{ id: 'user-1', name: 'Ana', email: 'ana@example.com', role: 'OWNER', invited: false }] },
+        IssueWorkLogs: { issueWorkLogs: { totalHours: 1.5, entries: [{ id: 'log-1', userName: 'Ana', hours: 1.5, note: 'Pruebas', loggedAt: '2026-11-15T12:00:00.000Z' }] } },
       };
       return { data: dataByName[name] || null, loading: false, error: undefined, refetch: jest.fn().mockResolvedValue({}) };
     });
@@ -59,9 +81,11 @@ describe('App', () => {
         AiDecomposeEpic: { aiDecomposeEpic: { epicTitle: 'Épica', stories: [] } },
         AiImproveStory: { aiImproveStory: { storyPoints: 3, acceptanceCriteriaGherkin: 'Given... Then...' } },
         AiBreakdownTask: { aiBreakdownTask: { parentTitle: 'Tarea', subtasks: [] } },
-        AddWorkspaceMember: { addWorkspaceMember: { id: 'user-2', email: 'member@example.com' } },
+        AddProjectMember: { addProjectMember: { id: 'user-2', name: 'Beto', email: 'member@example.com', role: 'MEMBER', invited: true } },
+        RemoveProjectMember: { removeProjectMember: true },
       };
-      return [jest.fn().mockResolvedValue({ data: resultByName[name] }), { loading: false, error: undefined }];
+      mutations[name] = mutations[name] || jest.fn().mockResolvedValue({ data: resultByName[name] });
+      return [mutations[name], { loading: false, error: undefined }];
     });
   });
 
@@ -122,5 +146,213 @@ describe('App', () => {
 
     fireEvent.click(screen.getByTestId('tab-analytics'));
     expect(screen.getByTestId('page-analytics')).toBeInTheDocument();
+  });
+
+  it('creates a project and invites a member to it as workspace owner', async () => {
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    renderApp();
+
+    fireEvent.click(await screen.findByText('+ Proyecto'));
+    fireEvent.change(screen.getByPlaceholderText('Nombre del proyecto'), { target: { value: 'Nuevo' } });
+    fireEvent.change(screen.getByPlaceholderText('CLAVE'), { target: { value: 'new-1' } });
+    fireEvent.click(screen.getByText('Crear'));
+    await waitFor(() => expect(mutations.CreateProject).toHaveBeenCalledWith({
+      variables: { input: { workspaceId: 'workspace-1', name: 'Nuevo', key: 'NEW1', description: '' } },
+    }));
+
+    // Invitations are per project now: there is no workspace-wide invite in the toolbar.
+    expect(screen.queryByLabelText('Email del nuevo miembro')).not.toBeInTheDocument();
+    // Wait until the project creation finished (it selects the new project), then pick an existing one.
+    await waitFor(() => expect(screen.queryByPlaceholderText('Nombre del proyecto')).not.toBeInTheDocument());
+    await selectProject();
+    fireEvent.click(screen.getByTestId('btn-project-members'));
+    fireEvent.change(screen.getByLabelText('Email de la persona a invitar'), { target: { value: 'member@example.com' } });
+    fireEvent.click(screen.getByText('Invitar'));
+    await waitFor(() => expect(mutations.AddProjectMember).toHaveBeenCalledWith({
+      variables: { input: { projectId: 'project-1', email: 'member@example.com' } },
+    }));
+    expect(await screen.findByText('Beto ahora tiene acceso a Plataforma.')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Cerrar miembros'));
+    expect(screen.queryByTestId('project-members-overlay')).not.toBeInTheDocument();
+  });
+
+  it('opens the issue detail from the backlog with its epic, author and hours', async () => {
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    renderApp();
+    await selectProject();
+
+    fireEvent.click(screen.getByTestId('issue-row-PLAT-1'));
+
+    const detail = await screen.findByRole('dialog', { name: /PLAT-1/ });
+    expect(detail).toHaveTextContent('Crear tablero');
+    expect(detail).toHaveTextContent('Tablero del equipo');
+    expect(screen.getByTestId('issue-detail-hours')).toHaveTextContent('1.50 h');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: /PLAT-1/ })).not.toBeInTheDocument();
+  });
+
+  it('creates an issue from the modal sending numeric type and priority', async () => {
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    renderApp();
+    await selectProject();
+
+    fireEvent.click(screen.getByTestId('btn-create-issue'));
+    fireEvent.change(screen.getByTestId('input-issue-title'), { target: { value: 'Corregir login' } });
+    fireEvent.change(screen.getByTestId('select-issue-type'), { target: { value: 'BUG' } });
+    fireEvent.change(screen.getByTestId('select-issue-priority'), { target: { value: 'CRITICAL' } });
+    fireEvent.click(screen.getByTestId('btn-submit-issue'));
+
+    await waitFor(() => expect(mutations.CreateIssue).toHaveBeenCalled());
+    expect(mutations.CreateIssue.mock.calls[0][0].variables.input).toMatchObject({
+      projectId: 'project-1', title: 'Corregir login', type: 3, priority: 4,
+    });
+  });
+
+  it('asks the AI to segment a task and to improve a story from the issue modal', async () => {
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    renderApp();
+    await selectProject();
+
+    fireEvent.click(screen.getByTestId('btn-create-issue'));
+    fireEvent.change(screen.getByTestId('input-issue-title'), { target: { value: 'Pagos' } });
+    fireEvent.click(screen.getByText('Sugerir criterios y estimación con IA'));
+    await waitFor(() => expect(mutations.AiImproveStory).toHaveBeenCalledWith({
+      variables: { input: { title: 'Pagos', description: '', type: 'STORY', projectId: 'project-1' } },
+    }));
+
+    fireEvent.click(screen.getByText('Segmentar en subtareas con IA'));
+    await waitFor(() => expect(mutations.AiBreakdownTask).toHaveBeenCalledWith({
+      variables: { input: { title: 'Pagos', description: '', projectId: 'project-1' } },
+    }));
+  });
+
+  it('assigns an issue to a sprint and starts and completes sprints', async () => {
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    renderApp();
+    await selectProject();
+
+    fireEvent.change(screen.getByLabelText('Sprint de PLAT-1'), { target: { value: 'sprint-2' } });
+    await waitFor(() => expect(mutations.AssignIssuesToSprint).toHaveBeenCalledWith({
+      variables: { input: { issueIds: ['issue-1'], sprintId: 'sprint-2' } },
+    }));
+
+    fireEvent.click(screen.getByTestId('tab-timeline'));
+    fireEvent.click(screen.getByText('Iniciar sprint'));
+    await waitFor(() => expect(mutations.StartSprint).toHaveBeenCalledWith({ variables: { id: 'sprint-2' } }));
+    fireEvent.click(screen.getByText('Completar sprint'));
+    await waitFor(() => expect(mutations.CompleteSprint).toHaveBeenCalledWith({ variables: { id: 'sprint-1' } }));
+  });
+
+  it('shows mutation errors in the alert banner and clears the session on logout', async () => {
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    renderApp();
+    await selectProject();
+    mutations.UpdateIssueStatus.mockRejectedValueOnce(new Error('Transición no permitida'));
+
+    fireEvent.click(screen.getByTestId('tab-board'));
+    fireEvent.click(screen.getByTestId('btn-advance-PLAT-1'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Transición no permitida');
+    fireEvent.click(screen.getByText('Reintentar'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Salir'));
+    expect(await screen.findByText('Bienvenido de nuevo')).toBeInTheDocument();
+    expect(window.localStorage.getItem('jira-ai-token')).toBeNull();
+  });
+
+  it('shows an AI story creation error only inside the drawer, not in the global banner', async () => {
+    const createIssueMock = jest.fn().mockRejectedValue(new Error('Proyecto no encontrado'));
+    const defaultUseMutation = apolloMocks.useMutation.getMockImplementation()!;
+    apolloMocks.useMutation.mockImplementation((mutation: any) => {
+      const name = mutation.definitions.find((d: any) => d.kind === 'OperationDefinition')?.name?.value;
+      if (name === 'CreateIssue') return [createIssueMock, { loading: false, error: undefined }];
+      if (name === 'AiDecomposeEpic') {
+        return [jest.fn().mockResolvedValue({
+          data: {
+            aiDecomposeEpic: {
+              epicTitle: 'Pagos',
+              stories: [{ title: 'Pasarela', description: 'd', type: 'STORY', priority: 'HIGH', estimatedStoryPoints: 3, acceptanceCriteriaGherkin: 'g' }],
+            },
+          },
+        }), { loading: false, error: undefined }];
+      }
+      return defaultUseMutation(mutation);
+    });
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    renderApp();
+    await selectProject();
+
+    fireEvent.click(screen.getByTestId('btn-ai-assistant'));
+    fireEvent.change(screen.getByTestId('input-ai-epic-title'), { target: { value: 'Pagos' } });
+    fireEvent.click(screen.getByTestId('btn-ai-decompose-submit'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Crear' }));
+
+    await waitFor(() => expect(createIssueMock).toHaveBeenCalledTimes(1));
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toHaveTextContent('Proyecto no encontrado');
+    expect(screen.getByTestId('ai-drawer')).toContainElement(alerts[0]);
+    expect(document.querySelector('.app-error')).toBeNull();
+  });
+
+  it('creates the epic first and its AI-suggested stories under it, keeping their type and priority', async () => {
+    const createIssueMock = jest.fn()
+      .mockResolvedValueOnce({ data: { createIssue: { id: 'epic-1', key: 'PLAT-7' } } })
+      .mockResolvedValue({ data: { createIssue: { id: 'issue-9' } } });
+    const defaultUseMutation = apolloMocks.useMutation.getMockImplementation()!;
+    apolloMocks.useMutation.mockImplementation((mutation: any) => {
+      const name = mutation.definitions.find((d: any) => d.kind === 'OperationDefinition')?.name?.value;
+      if (name === 'CreateIssue') return [createIssueMock, { loading: false, error: undefined }];
+      if (name === 'AiDecomposeEpic') {
+        return [jest.fn().mockResolvedValue({
+          data: {
+            aiDecomposeEpic: {
+              epicTitle: 'Pagos',
+              stories: [
+                { title: 'Fallo en webhook', description: 'Bug', type: 'BUG', priority: 'HIGH', estimatedStoryPoints: 2, acceptanceCriteriaGherkin: 'Given' },
+                { title: 'Épica hija', description: 'Epic', type: 'EPIC', estimatedStoryPoints: '8', acceptanceCriteriaGherkin: 'Given' },
+              ],
+            },
+          },
+        }), { loading: false, error: undefined }];
+      }
+      return defaultUseMutation(mutation);
+    });
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    render(
+      <ApolloProvider client={createApolloClient('http://localhost/graphql')}>
+        <App />
+      </ApolloProvider>,
+    );
+
+    fireEvent.change(await screen.findByLabelText('Proyecto'), { target: { value: 'project-1' } });
+    fireEvent.click(screen.getByTestId('btn-ai-assistant'));
+    fireEvent.change(screen.getByTestId('input-ai-epic-title'), { target: { value: 'Pagos' } });
+    fireEvent.click(screen.getByTestId('btn-ai-decompose-submit'));
+
+    const createButtons = await screen.findAllByRole('button', { name: 'Crear' });
+    fireEvent.click(createButtons[0]);
+    await waitFor(() => expect(createIssueMock).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('Creada como PLAT-7')).toBeInTheDocument();
+    fireEvent.click(createButtons[1]);
+    await waitFor(() => expect(createIssueMock).toHaveBeenCalledTimes(3));
+
+    // 1. The epic itself, as an EPIC issue without points.
+    expect(createIssueMock.mock.calls[0][0].variables.input).toMatchObject({ title: 'Pagos', type: 4, storyPoints: 0 });
+    expect(createIssueMock.mock.calls[0][0].variables.input.parentId).toBeUndefined();
+    // 2. The suggested bug, linked to the epic.
+    expect(createIssueMock.mock.calls[1][0].variables.input).toMatchObject({ type: 3, priority: 3, storyPoints: 2, parentId: 'epic-1' });
+    // 3. An EPIC suggestion cannot belong to another epic: created without parent, and the epic is not created again.
+    expect(createIssueMock.mock.calls[2][0].variables.input).toMatchObject({ type: 4, priority: 2, storyPoints: 8 });
+    expect(createIssueMock.mock.calls[2][0].variables.input.parentId).toBeUndefined();
+  });
+});
+
+describe('AI_DECOMPOSE_EPIC operation', () => {
+  it('requests the suggested priority of each story so it reaches createIssue', () => {
+    const { AI_DECOMPOSE_EPIC } = jest.requireActual('../src/graphql/client');
+    const printed: string = AI_DECOMPOSE_EPIC.loc.source.body;
+    const storiesSelection = printed.slice(printed.indexOf('stories {'));
+    expect(storiesSelection).toMatch(/\bpriority\b/);
   });
 });

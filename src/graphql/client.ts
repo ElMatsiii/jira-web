@@ -50,9 +50,30 @@ export const CREATE_PROJECT = gql`
   }
 `;
 
-export const ADD_WORKSPACE_MEMBER = gql`
-  mutation AddWorkspaceMember($input: AddWorkspaceMemberInput!) {
-    addWorkspaceMember(input: $input) { id name email }
+export const GET_PROJECT_MEMBERS = gql`
+  query ProjectMembers($projectId: String!) {
+    projectMembers(projectId: $projectId) { id name email role invited }
+  }
+`;
+
+export const ADD_PROJECT_MEMBER = gql`
+  mutation AddProjectMember($input: AddProjectMemberInput!) {
+    addProjectMember(input: $input) { id name email role invited }
+  }
+`;
+
+export const REMOVE_PROJECT_MEMBER = gql`
+  mutation RemoveProjectMember($input: RemoveProjectMemberInput!) {
+    removeProjectMember(input: $input)
+  }
+`;
+
+export const GET_ISSUE_WORK_LOGS = gql`
+  query IssueWorkLogs($projectId: String!, $issueId: String!) {
+    issueWorkLogs(projectId: $projectId, issueId: $issueId) {
+      totalHours
+      entries { id userName hours note loggedAt }
+    }
   }
 `;
 
@@ -103,30 +124,11 @@ export const GET_BACKLOG = gql`
       type
       storyPoints
       sprintId
+      parentId
       assigneeId
+      reporterName
       acceptanceCriteria
-    }
-  }
-`;
-
-export const GET_SPRINT_BOARD = gql`
-  query GetSprintBoard($projectId: String!, $sprintId: String) {
-    listIssues(projectId: $projectId, sprintId: $sprintId) {
-      id
-      key
-      title
-      status
-      priority
-      storyPoints
-      assigneeId
-    }
-    listSprints(projectId: $projectId) {
-      id
-      name
-      goal
-      status
-      totalStoryPoints
-      completedStoryPoints
+      createdAt
     }
   }
 `;
@@ -136,6 +138,7 @@ export const GET_BURNDOWN_ANALYTICS = gql`
     getBurndownAnalytics(sprintId: $sprintId) {
       sprintId
       velocity
+      velocitySampleSize
       idealBurndown
       actualBurndown
       blockedCount
@@ -192,6 +195,7 @@ export const AI_DECOMPOSE_EPIC = gql`
         title
         description
         type
+        priority
         estimatedStoryPoints
         acceptanceCriteriaGherkin
       }
@@ -215,17 +219,6 @@ export const AI_IMPROVE_STORY = gql`
       reasoning
       complexityFactors
       acceptanceCriteriaGherkin
-    }
-  }
-`;
-
-export const AI_PLAN_SPRINT = gql`
-  mutation AiPlanSprint($input: PlanSprintInput!) {
-    aiPlanSprint(input: $input) {
-      sprintGoal
-      allocatedStoryPoints
-      recommendedIssueIds
-      riskAssessment
     }
   }
 `;

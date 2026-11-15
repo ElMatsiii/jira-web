@@ -5,6 +5,8 @@ import { Navbar } from './components/Navbar';
 import { CreateIssueModal } from './components/CreateIssueModal';
 import { AIAssistantDrawer } from './components/AIAssistantDrawer';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ProjectMembersPanel } from './components/ProjectMembersPanel';
+import { IssueDetailPanel } from './components/IssueDetailPanel';
 import { BacklogPage, Issue } from './pages/BacklogPage';
 import { BoardPage } from './pages/BoardPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
@@ -17,7 +19,6 @@ import {
   typeToId,
 } from './utils/issue-utils';
 import {
-  ADD_WORKSPACE_MEMBER,
   ASSIGN_ISSUES_TO_SPRINT,
   AI_DECOMPOSE_EPIC,
   AI_IMPROVE_STORY,
@@ -57,7 +58,8 @@ export const App: React.FC = () => {
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [projectName, setProjectName] = useState('');
   const [projectKey, setProjectKey] = useState('');
-  const [memberEmail, setMemberEmail] = useState('');
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [issueModalOpen, setIssueModalOpen] = useState(false);
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -94,9 +96,10 @@ export const App: React.FC = () => {
     skip: !token || !projectId,
     fetchPolicy: 'cache-and-network',
   });
-  const rawIssues: any[] = issuesQuery.data?.listIssues || [];
+  // Keep the Apollo reference (not a fresh `|| []`) as the memo dependency so it only recomputes on new data.
+  const rawIssues: any[] | undefined = issuesQuery.data?.listIssues;
   const issues: Issue[] = useMemo(() => {
-    return rawIssues.map((raw) => ({
+    return (rawIssues || []).map((raw) => ({
       ...raw,
       id: String(raw.id || ''),
       key: String(raw.key || 'INC'),
@@ -107,8 +110,11 @@ export const App: React.FC = () => {
       type: normalizeType(raw.type),
       storyPoints: Number(raw.storyPoints) || 0,
       sprintId: raw.sprintId || '',
+      parentId: raw.parentId || undefined,
       assigneeId: raw.assigneeId || '',
       acceptanceCriteria: raw.acceptanceCriteria || '',
+      reporterName: raw.reporterName || undefined,
+      createdAt: raw.createdAt || undefined,
     }));
   }, [rawIssues]);
   const sprints: Sprint[] = sprintsQuery.data?.listSprints || [];
@@ -116,7 +122,6 @@ export const App: React.FC = () => {
   const sprintIssues = activeSprint ? issues.filter((issue) => issue.sprintId === activeSprint.id) : [];
 
   const [createProject] = useMutation(CREATE_PROJECT);
-  const [addMember] = useMutation(ADD_WORKSPACE_MEMBER);
   const [createIssue] = useMutation(CREATE_ISSUE);
   const [updateIssueStatus] = useMutation(UPDATE_ISSUE_STATUS);
   const [assignIssuesToSprint] = useMutation(ASSIGN_ISSUES_TO_SPRINT);
@@ -144,6 +149,10 @@ export const App: React.FC = () => {
       throw error;
     }
   };
+
+  // For fire-and-forget actions (board/backlog/timeline buttons): the banner shows the error,
+  // so the rejection is swallowed instead of becoming an unhandled promise rejection.
+  const runBannerAction = (action: () => Promise<unknown>) => runAction(action).catch(() => undefined);
 
   if (!token) return <AuthPage onAuthenticated={setToken} />;
   if (meQuery.error) {
@@ -173,11 +182,6 @@ export const App: React.FC = () => {
     setShowProjectForm(false);
   });
 
-  const handleAddMember = () => runAction(async () => {
-    await addMember({ variables: { input: { workspaceId, email: memberEmail } } });
-    setMemberEmail('');
-  });
-
   const handleCreateIssue = (newIssue: {
     title: string; description: string; type: string; priority: string; storyPoints: number;
     acceptanceCriteria: string;
@@ -200,12 +204,12 @@ export const App: React.FC = () => {
     await issuesQuery.refetch();
   });
 
-  const handleUpdateStatus = (id: string, status: string) => runAction(async () => {
+  const handleUpdateStatus = (id: string, status: string) => runBannerAction(async () => {
     await updateIssueStatus({ variables: { input: { id, status } } });
     await issuesQuery.refetch();
   });
 
-  const handleAssignIssue = (id: string, sprintId: string) => runAction(async () => {
+  const handleAssignIssue = (id: string, sprintId: string) => runBannerAction(async () => {
     await assignIssuesToSprint({ variables: { input: { issueIds: [id], sprintId } } });
     await issuesQuery.refetch();
     await sprintsQuery.refetch();
@@ -227,12 +231,12 @@ export const App: React.FC = () => {
       await sprintsQuery.refetch();
     });
 
-  const handleStartSprint = (id: string) => runAction(async () => {
+  const handleStartSprint = (id: string) => runBannerAction(async () => {
     await startSprint({ variables: { id } });
     await sprintsQuery.refetch();
   });
 
-  const handleCompleteSprint = (id: string) => runAction(async () => {
+  const handleCompleteSprint = (id: string) => runBannerAction(async () => {
     await completeSprint({ variables: { id } });
     await sprintsQuery.refetch();
   });
@@ -264,31 +268,60 @@ export const App: React.FC = () => {
     return result;
   };
 
-  const handleCreateSuggestedStory = (story: {
+  // The AI handlers below are not wrapped in runAction: the AI drawer catches the rejection and
+  // shows the error itself, so it must not also appear in the global banner.
+
+  /** Creates the decomposed epic as an EPIC issue; its stories are then created with its id as parentId. */
+  const handleCreateEpic = async (title: string, description: string) => {
+    const response = await createIssue({
+      variables: {
+        input: {
+          projectId,
+          title,
+          description: description || '',
+          type: typeToId('EPIC'),
+          priority: priorityToId('MEDIUM'),
+          storyPoints: 0,
+          acceptanceCriteria: '',
+        },
+      },
+    });
+    const epic = response.data?.createIssue;
+    if (!epic?.id) throw new Error('No se pudo crear la épica en el backlog.');
+    await issuesQuery.refetch();
+    return { id: String(epic.id), key: String(epic.key || '') };
+  };
+
+  const handleCreateSuggestedStory = async (story: {
     title: string;
     description: string;
     type: string;
+    priority?: string;
     estimatedStoryPoints: number;
     acceptanceCriteriaGherkin: string;
-  }) => runAction(async () => {
-    const type = story.type === 'TASK' ? 2 : 1;
+  }, parentId?: string) => {
     await createIssue({
       variables: {
         input: {
           projectId,
           title: story.title,
           description: story.description,
-          type,
-          priority: 2,
-          storyPoints: story.estimatedStoryPoints,
+          type: typeToId(story.type),
+          priority: priorityToId(story.priority),
+          storyPoints: Number(story.estimatedStoryPoints) || 0,
           acceptanceCriteria: story.acceptanceCriteriaGherkin,
+          ...(parentId ? { parentId } : {}),
         },
       },
     });
     await issuesQuery.refetch();
-  });
+  };
 
   const queryError = issuesQuery.error || sprintsQuery.error || projectsQuery.error;
+  const canManageWorkspace = ['OWNER', 'ADMIN'].includes(activeWorkspace?.role || '');
+  const selectedIssue = selectedIssueId ? issues.find((issue) => issue.id === selectedIssueId) : undefined;
+  const selectedParent = selectedIssue?.parentId ? issues.find((issue) => issue.id === selectedIssue.parentId) : undefined;
+  const selectedEpic = selectedParent ? { key: selectedParent.key, title: selectedParent.title } : null;
 
   return (
     <div className="app-layout">
@@ -320,14 +353,13 @@ export const App: React.FC = () => {
               {projects.map((item) => <option key={item.id} value={item.id}>{item.key} · {item.name}</option>)}
             </select>
           </label>
-          {['OWNER', 'ADMIN'].includes(activeWorkspace?.role || '') && (
+          {canManageWorkspace && (
             <button className="btn btn-secondary btn-sm" onClick={() => setShowProjectForm((shown) => !shown)} disabled={!workspaceId}>+ Proyecto</button>
           )}
-          {['OWNER', 'ADMIN'].includes(activeWorkspace?.role || '') && (
-            <form className="member-form" onSubmit={(event) => { event.preventDefault(); void handleAddMember(); }}>
-              <input className="form-input" type="email" placeholder="Agregar miembro por email" value={memberEmail} onChange={(event) => setMemberEmail(event.target.value)} aria-label="Email del nuevo miembro" />
-              <button className="btn btn-secondary btn-sm" type="submit" disabled={!memberEmail.trim()}>Invitar</button>
-            </form>
+          {project && (
+            <button className="btn btn-secondary btn-sm" onClick={() => setMembersOpen(true)} data-testid="btn-project-members">
+              Miembros del proyecto
+            </button>
           )}
         </section>
         {showProjectForm && (
@@ -346,7 +378,7 @@ export const App: React.FC = () => {
         {!projectId ? (
           <main className="main-content empty-project-state">
             <h1>{projects.length ? 'Selecciona un proyecto' : 'Crea el primer proyecto de tu equipo'}</h1>
-            <p>Los proyectos, historias y actividad son compartidos con los miembros de este espacio de trabajo.</p>
+            <p>Cada proyecto se comparte con las personas invitadas a él; el propietario y los administradores del espacio ven todos.</p>
             {!projects.length && <button className="btn btn-primary" onClick={() => setShowProjectForm(true)}>Crear proyecto</button>}
           </main>
         ) : (
@@ -359,6 +391,7 @@ export const App: React.FC = () => {
                 onOpenCreateModal={() => setIssueModalOpen(true)}
                 onOpenAiDrawer={() => setAiDrawerOpen(true)}
                 onAssignIssue={handleAssignIssue}
+                onSelectIssue={setSelectedIssueId}
               />
             )}
             {tab === 'board' && (
@@ -388,6 +421,22 @@ export const App: React.FC = () => {
           </ErrorBoundary>
         )}
       </div>
+      {membersOpen && project && (
+        <ProjectMembersPanel
+          projectId={project.id}
+          projectName={project.name}
+          canManage={canManageWorkspace}
+          onClose={() => setMembersOpen(false)}
+        />
+      )}
+      {selectedIssue && (
+        <IssueDetailPanel
+          projectId={projectId}
+          issue={selectedIssue}
+          epic={selectedEpic}
+          onClose={() => setSelectedIssueId(null)}
+        />
+      )}
       <CreateIssueModal
         isOpen={issueModalOpen}
         onClose={() => setIssueModalOpen(false)}
@@ -401,6 +450,7 @@ export const App: React.FC = () => {
           onClose={() => setAiDrawerOpen(false)}
           onDecomposeEpic={handleDecomposeEpic}
           onCreateStory={handleCreateSuggestedStory}
+          onCreateEpic={handleCreateEpic}
         />
       )}
     </div>

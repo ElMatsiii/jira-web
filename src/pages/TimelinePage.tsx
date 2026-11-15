@@ -1,4 +1,11 @@
 import React, { useState } from 'react';
+import {
+  DEFAULT_SPRINT_WEEKS,
+  SPRINT_DURATION_WEEKS,
+  isEndOnOrAfterStart,
+  sprintEndDate,
+  todayLocal,
+} from '../utils/date-utils';
 
 interface Sprint {
   id: string;
@@ -19,8 +26,6 @@ interface TimelinePageProps {
   onCompleteSprint: (id: string) => Promise<unknown>;
 }
 
-const dateValue = (date: Date) => date.toISOString().slice(0, 10);
-
 export const TimelinePage: React.FC<TimelinePageProps> = ({
   sprints,
   loading,
@@ -28,22 +33,42 @@ export const TimelinePage: React.FC<TimelinePageProps> = ({
   onStartSprint,
   onCompleteSprint,
 }) => {
-  const start = new Date();
-  const end = new Date(start);
-  end.setDate(end.getDate() + 14);
   const [name, setName] = useState('');
   const [goal, setGoal] = useState('');
-  const [startDate, setStartDate] = useState(dateValue(start));
-  const [endDate, setEndDate] = useState(dateValue(end));
+  const [weeks, setWeeks] = useState<number>(DEFAULT_SPRINT_WEEKS);
+  const [startDate, setStartDate] = useState(() => todayLocal());
+  const [endDate, setEndDate] = useState(() => sprintEndDate(todayLocal(), DEFAULT_SPRINT_WEEKS));
   const [submitting, setSubmitting] = useState(false);
+
+  const datesValid = isEndOnOrAfterStart(startDate, endDate);
+  const endIsManual = datesValid && endDate !== sprintEndDate(startDate, weeks);
+  const dateError = startDate && endDate && !datesValid
+    ? 'La fecha de fin no puede ser anterior a la fecha de inicio.'
+    : '';
+
+  // Picking a start date or a duration recalculates the end; the end stays editable afterwards.
+  const changeStart = (value: string) => {
+    setStartDate(value);
+    const computed = sprintEndDate(value, weeks);
+    if (computed) setEndDate(computed);
+  };
+
+  const changeWeeks = (value: number) => {
+    setWeeks(value);
+    const computed = sprintEndDate(startDate, value);
+    if (computed) setEndDate(computed);
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!datesValid) return;
     setSubmitting(true);
     try {
       await onCreateSprint({ name, goal, startDate, endDate });
       setName('');
       setGoal('');
+    } catch {
+      // The parent shows the error banner; keep the form values so the user can retry.
     } finally {
       setSubmitting(false);
     }
@@ -70,16 +95,43 @@ export const TimelinePage: React.FC<TimelinePageProps> = ({
           </label>
           <label className="form-group">
             <span className="form-label">Inicio</span>
-            <input className="form-input" type="date" required value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+            <input className="form-input" type="date" required value={startDate} onChange={(event) => changeStart(event.target.value)} />
+          </label>
+          <label className="form-group">
+            <span className="form-label">Duración</span>
+            <select className="form-select" value={weeks} onChange={(event) => changeWeeks(Number(event.target.value))}>
+              {SPRINT_DURATION_WEEKS.map((option) => (
+                <option key={option} value={option}>{option === 1 ? '1 semana' : `${option} semanas`}</option>
+              ))}
+            </select>
           </label>
           <label className="form-group">
             <span className="form-label">Fin</span>
-            <input className="form-input" type="date" required min={startDate} value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+            <input
+              className="form-input"
+              type="date"
+              required
+              min={startDate}
+              value={endDate}
+              onChange={(event) => setEndDate(event.target.value)}
+              aria-invalid={Boolean(dateError)}
+              aria-describedby="sprint-dates-hint"
+            />
           </label>
-          <button className="btn btn-primary" type="submit" disabled={submitting || !name.trim()}>
+          <button className="btn btn-primary" type="submit" disabled={submitting || !name.trim() || !datesValid}>
             {submitting ? 'Guardando...' : 'Crear sprint'}
           </button>
         </form>
+        <p
+          id="sprint-dates-hint"
+          className={dateError ? 'form-error timeline-dates-hint' : 'timeline-dates-hint'}
+          role={dateError ? 'alert' : undefined}
+        >
+          {dateError
+            || (endIsManual
+              ? 'Fecha de fin ajustada manualmente; cambia el inicio o la duración para recalcularla.'
+              : 'La fecha de fin se calcula a partir del inicio y la duración; puedes ajustarla a mano.')}
+        </p>
       </section>
       <section className="timeline-list">
         <h2>Sprints del proyecto</h2>
