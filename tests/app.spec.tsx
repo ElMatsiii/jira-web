@@ -268,8 +268,10 @@ describe('App', () => {
     expect(document.querySelector('.app-error')).toBeNull();
   });
 
-  it('creates AI-suggested stories keeping their type and priority', async () => {
-    const createIssueMock = jest.fn().mockResolvedValue({ data: { createIssue: { id: 'issue-9' } } });
+  it('creates the epic first and its AI-suggested stories under it, keeping their type and priority', async () => {
+    const createIssueMock = jest.fn()
+      .mockResolvedValueOnce({ data: { createIssue: { id: 'epic-1', key: 'PLAT-7' } } })
+      .mockResolvedValue({ data: { createIssue: { id: 'issue-9' } } });
     const defaultUseMutation = apolloMocks.useMutation.getMockImplementation()!;
     apolloMocks.useMutation.mockImplementation((mutation: any) => {
       const name = mutation.definitions.find((d: any) => d.kind === 'OperationDefinition')?.name?.value;
@@ -303,12 +305,19 @@ describe('App', () => {
 
     const createButtons = await screen.findAllByRole('button', { name: 'Crear' });
     fireEvent.click(createButtons[0]);
-    await waitFor(() => expect(createIssueMock).toHaveBeenCalledTimes(1));
-    fireEvent.click(createButtons[1]);
     await waitFor(() => expect(createIssueMock).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('Creada como PLAT-7')).toBeInTheDocument();
+    fireEvent.click(createButtons[1]);
+    await waitFor(() => expect(createIssueMock).toHaveBeenCalledTimes(3));
 
-    expect(createIssueMock.mock.calls[0][0].variables.input).toMatchObject({ type: 3, priority: 3, storyPoints: 2 });
-    expect(createIssueMock.mock.calls[1][0].variables.input).toMatchObject({ type: 4, priority: 2, storyPoints: 8 });
+    // 1. The epic itself, as an EPIC issue without points.
+    expect(createIssueMock.mock.calls[0][0].variables.input).toMatchObject({ title: 'Pagos', type: 4, storyPoints: 0 });
+    expect(createIssueMock.mock.calls[0][0].variables.input.parentId).toBeUndefined();
+    // 2. The suggested bug, linked to the epic.
+    expect(createIssueMock.mock.calls[1][0].variables.input).toMatchObject({ type: 3, priority: 3, storyPoints: 2, parentId: 'epic-1' });
+    // 3. An EPIC suggestion cannot belong to another epic: created without parent, and the epic is not created again.
+    expect(createIssueMock.mock.calls[2][0].variables.input).toMatchObject({ type: 4, priority: 2, storyPoints: 8 });
+    expect(createIssueMock.mock.calls[2][0].variables.input.parentId).toBeUndefined();
   });
 });
 

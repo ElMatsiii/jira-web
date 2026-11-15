@@ -103,6 +103,7 @@ export const GET_BACKLOG = gql`
       type
       storyPoints
       sprintId
+      parentId
       assigneeId
       acceptanceCriteria
     }
@@ -114,6 +115,7 @@ export const GET_BURNDOWN_ANALYTICS = gql`
     getBurndownAnalytics(sprintId: $sprintId) {
       sprintId
       velocity
+      velocitySampleSize
       idealBurndown
       actualBurndown
       blockedCount

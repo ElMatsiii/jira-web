@@ -932,6 +932,27 @@ select {
   border-bottom: none;
 }
 
+/* Issues listed under their epic in the backlog. */
+.issue-item.is-epic-child {
+  padding-left: 40px;
+  background-color: var(--bg-subtle);
+}
+
+.epic-child-marker {
+  color: var(--text-muted);
+}
+
+.epic-child-count,
+.epic-parent-chip {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .issue-item:hover {
   background-color: var(--bg-surface-muted);
 }
@@ -1451,6 +1472,23 @@ select {
   border-color: var(--status-blocked-border);
   background-color: var(--status-blocked-bg);
   color: var(--status-blocked-text);
+}
+
+/* Not classified by pace: the sprint has not started, or it has no story points. */
+.health-badge.is-not-started,
+.health-badge.is-no-scope {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
+.stat-hint {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.burndown-today {
+  fill: var(--primary-brand);
 }
 
 .ai-diagnosis-card {
@@ -2222,6 +2260,12 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ai-epic-status {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .ai-drawer-error {

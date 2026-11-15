@@ -63,7 +63,7 @@ describe('AnalyticsPage', () => {
     // Dark-theme colors are gone from the markup; strokes come from CSS.
     expect(container.innerHTML).not.toMatch(/#3f3f46|#71717a|#3b82f6/i);
     expect(screen.getByText('Ideal')).toHaveClass('burndown-legend-item', 'is-ideal');
-    expect(screen.getByText('Real')).toHaveClass('burndown-legend-item');
+    expect(screen.getByText('Real (hasta hoy)')).toHaveClass('burndown-legend-item');
 
     const kpis = container.querySelector('.analytics-kpis') as HTMLElement;
     expect(within(kpis).getByText('21 SP / sprint')).toBeInTheDocument();
@@ -72,11 +72,43 @@ describe('AnalyticsPage', () => {
     expect(within(kpis).getByTestId('sprint-health')).toHaveClass('health-badge', 'is-at-risk');
   });
 
-  it('explains when there are not enough burndown points to draw the chart', () => {
-    burndown = { data: { getBurndownAnalytics: { ...METRICS, actualBurndown: [20] } } };
+  it('explains when the sprint has no ideal line to draw', () => {
+    burndown = { data: { getBurndownAnalytics: { ...METRICS, idealBurndown: [20], actualBurndown: [20] } } };
     render(<AnalyticsPage projectId="project-1" sprint={SPRINT} issues={ISSUES} />);
     expect(screen.getByText(/El burndown estará disponible/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Gráfico de burndown del sprint')).not.toBeInTheDocument();
+  });
+
+  it('draws the whole ideal line and the real one only up to today', () => {
+    burndown = { data: { getBurndownAnalytics: { ...METRICS, idealBurndown: [20, 10, 0], actualBurndown: [20, 14, null] } } };
+    const { container } = render(<AnalyticsPage projectId="project-1" sprint={SPRINT} issues={ISSUES} />);
+    const ideal = container.querySelector('.burndown-ideal') as SVGPolylineElement;
+    const real = container.querySelector('.burndown-actual') as SVGPolylineElement;
+    expect(ideal.getAttribute('points')?.split(' ')).toHaveLength(3);
+    expect(real.getAttribute('points')?.split(' ')).toHaveLength(2);
+    expect(screen.getByTestId('burndown-today')).toBeInTheDocument();
+  });
+
+  it('draws only the ideal line before the sprint starts', () => {
+    burndown = { data: { getBurndownAnalytics: { ...METRICS, healthStatus: 'NOT_STARTED', actualBurndown: [null, null, null] } } };
+    const { container } = render(<AnalyticsPage projectId="project-1" sprint={SPRINT} issues={ISSUES} />);
+    expect(container.querySelector('.burndown-ideal')).not.toBeNull();
+    expect(container.querySelector('.burndown-actual')).toBeNull();
+    expect(screen.queryByTestId('burndown-today')).not.toBeInTheDocument();
+    expect(screen.getByText('La línea real aparecerá cuando comience el sprint.')).toBeInTheDocument();
+  });
+
+  it('says there are no closed sprints instead of showing a velocity of 0', () => {
+    burndown = { data: { getBurndownAnalytics: { ...METRICS, velocity: 0, velocitySampleSize: 0 } } };
+    const first = render(<AnalyticsPage projectId="project-1" sprint={SPRINT} issues={ISSUES} />);
+    expect(screen.getByTestId('velocity-value')).toHaveTextContent('Sin sprints cerrados');
+    expect(screen.getByText('Se calculará al cerrar el primer sprint.')).toBeInTheDocument();
+    first.unmount();
+
+    burndown = { data: { getBurndownAnalytics: { ...METRICS, velocity: 18, velocitySampleSize: 2 } } };
+    render(<AnalyticsPage projectId="project-1" sprint={SPRINT} issues={ISSUES} />);
+    expect(screen.getByTestId('velocity-value')).toHaveTextContent('18 SP / sprint');
+    expect(screen.getByText('Promedio de 2 sprints cerrados')).toBeInTheDocument();
   });
 
   it('shows loading, error and empty states', () => {
@@ -207,6 +239,8 @@ describe('Sprint health badge', () => {
     ['HEALTHY', 'Saludable', 'is-healthy'],
     ['AT_RISK', 'En riesgo', 'is-at-risk'],
     ['CRITICAL', 'Crítico', 'is-critical'],
+    ['NOT_STARTED', 'Sin iniciar', 'is-not-started'],
+    ['NO_SCOPE', 'Sin alcance', 'is-no-scope'],
   ])('shows %s as "%s"', (status, label, className) => {
     burndown = { data: { getBurndownAnalytics: { ...METRICS, healthStatus: status } } };
     render(<AnalyticsPage projectId="project-1" sprint={SPRINT} issues={ISSUES} />);

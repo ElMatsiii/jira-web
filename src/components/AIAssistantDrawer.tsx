@@ -1,12 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { normalizePriority, normalizeType } from '../utils/issue-utils';
 import { AIStoryDetailModal, AISuggestedStory } from './AIStoryDetailModal';
+
+/** The epic created in the backlog for the stories of a decomposition. */
+export interface CreatedEpic {
+  id: string;
+  key: string;
+}
 
 export interface AIAssistantDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onDecomposeEpic: (epicTitle: string, epicDescription: string) => Promise<any>;
-  onCreateStory?: (story: AISuggestedStory) => Promise<void>;
+  /** parentId is the epic created for this decomposition (absent for an EPIC suggestion or without onCreateEpic). */
+  onCreateStory?: (story: AISuggestedStory, parentId?: string) => Promise<void>;
+  /** Creates the epic as an EPIC issue; called once, before the first story is created. */
+  onCreateEpic?: (title: string, description: string) => Promise<CreatedEpic>;
 }
 
 type StoryStatus = 'pending' | 'creating' | 'created';
@@ -23,12 +32,17 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
   onClose,
   onDecomposeEpic,
   onCreateStory,
+  onCreateEpic,
 }) => {
   const [epicTitle, setEpicTitle] = useState('');
   const [epicDescription, setEpicDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generatedFor, setGeneratedFor] = useState<string | null>(null);
+  const [generatedDescription, setGeneratedDescription] = useState('');
+  const [createdEpic, setCreatedEpic] = useState<(CreatedEpic & { title: string }) | null>(null);
+  // In-flight epic creation, so two quick clicks never create the epic twice.
+  const epicRequest = useRef<{ title: string; promise: Promise<CreatedEpic> } | null>(null);
   const [stories, setStories] = useState<StoryDraft[]>([]);
   const [formCollapsed, setFormCollapsed] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
@@ -64,7 +78,14 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
       const res = await onDecomposeEpic(epicTitle, epicDescription);
       const received: AISuggestedStory[] = Array.isArray(res?.stories) ? res.stories : [];
       setStories(received.map((story, index) => ({ ...story, draftId: index, status: 'pending' })));
-      setGeneratedFor(res?.epicTitle || epicTitle);
+      const title = res?.epicTitle || epicTitle;
+      // Regenerating for the same epic keeps the one already created; a new title gets a new epic.
+      if (createdEpic && createdEpic.title !== title) {
+        setCreatedEpic(null);
+        epicRequest.current = null;
+      }
+      setGeneratedFor(title);
+      setGeneratedDescription(epicDescription);
       setDetailId(null);
       setFormCollapsed(true);
     } catch (err: any) {
@@ -74,13 +95,31 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
     }
   };
 
-  /** Creates one story; returns false (and shows the error) when it fails. */
+  /** The epic of the current decomposition, created on first use (undefined without onCreateEpic). */
+  const ensureEpic = async (): Promise<string | undefined> => {
+    if (!onCreateEpic || generatedFor === null) return undefined;
+    if (createdEpic && createdEpic.title === generatedFor) return createdEpic.id;
+    if (!epicRequest.current || epicRequest.current.title !== generatedFor) {
+      const title = generatedFor;
+      const promise = onCreateEpic(title, generatedDescription);
+      epicRequest.current = { title, promise };
+      promise.then(
+        (epic) => setCreatedEpic({ ...epic, title }),
+        () => { epicRequest.current = null; },
+      );
+    }
+    return (await epicRequest.current.promise).id;
+  };
+
+  /** Creates one story under the epic; returns false (and shows the error) when it fails. */
   const createStory = async (story: StoryDraft): Promise<boolean> => {
     if (!onCreateStory) return false;
     setError(null);
     updateStory(story.draftId, { status: 'creating' });
     try {
-      await onCreateStory(toPayload(story));
+      // An EPIC suggestion cannot belong to another epic, so it is created without parent.
+      const parentId = normalizeType(story.type) === 'EPIC' ? undefined : await ensureEpic();
+      await onCreateStory(toPayload(story), parentId);
       updateStory(story.draftId, { status: 'created' });
       return true;
     } catch (requestError: any) {
@@ -156,6 +195,13 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
             <div className="ai-epic-summary-text">
               <span className="badge badge-epic">Épica</span>
               <strong>{generatedFor}</strong>
+              {onCreateEpic && (
+                <small className="ai-epic-status" data-testid="ai-epic-status">
+                  {createdEpic && createdEpic.title === generatedFor
+                    ? `Creada como ${createdEpic.key}`
+                    : 'Se creará en el backlog con la primera historia'}
+                </small>
+              )}
             </div>
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormCollapsed(false)}>
               Editar épica
@@ -303,7 +349,9 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
                         Ver detalle
                       </button>
                       {story.status === 'created' ? (
-                        <span className="ai-story-created">✓ Creada en el backlog</span>
+                        <span className="ai-story-created">
+                          ✓ Creada en el backlog{createdEpic && normalizeType(story.type) !== 'EPIC' ? ` · épica ${createdEpic.key}` : ''}
+                        </span>
                       ) : (
                         <>
                           {onCreateStory && (

@@ -7,6 +7,7 @@ import {
   normalizeStatus,
   normalizeType,
 } from '../utils/issue-utils';
+import { groupIssuesByEpic } from '../utils/epic-grouping';
 
 export interface Issue {
   id: string;
@@ -18,6 +19,8 @@ export interface Issue {
   type: IssueType | string | number;
   storyPoints: number;
   sprintId?: string;
+  /** Parent epic, when the issue belongs to one. */
+  parentId?: string;
   acceptanceCriteria?: string;
 }
 
@@ -53,6 +56,7 @@ export const BacklogPage: React.FC<BacklogPageProps> = ({
   });
 
   const totalPoints = filteredIssues.reduce((acc, curr) => acc + (Number(curr.storyPoints) || 0), 0);
+  const rows = groupIssuesByEpic(filteredIssues, issues);
 
   return (
     <div className="main-content" data-testid="page-backlog">
@@ -191,20 +195,35 @@ export const BacklogPage: React.FC<BacklogPageProps> = ({
             </div>
           </div>
         ) : (
-          filteredIssues.map((issue) => {
+          rows.map(({ issue, nested, childCount, parentKey }) => {
             const normType = normalizeType(issue.type);
             const normPriority = normalizePriority(issue.priority);
             const normStatus = normalizeStatus(issue.status);
             const displayKey = issue.key || 'INC';
             const displayTitle = issue.title || 'Sin título';
             return (
-              <div key={issue.id || displayKey} className="issue-item" data-testid={`issue-row-${displayKey}`}>
+              <div
+                key={issue.id || displayKey}
+                className={`issue-item${nested ? ' is-epic-child' : ''}`}
+                data-testid={`issue-row-${displayKey}`}
+              >
                 <div className="issue-left">
+                  {nested && <span className="epic-child-marker" aria-hidden="true">↳</span>}
                   <span className="issue-key">{displayKey}</span>
                   <span className={`badge badge-${normType.toLowerCase()}`}>
                     {normType}
                   </span>
                   <span className="issue-title" title={displayTitle}>{displayTitle}</span>
+                  {normType === 'EPIC' && childCount > 0 && (
+                    <span className="epic-child-count" data-testid={`epic-children-${displayKey}`}>
+                      {childCount} {childCount === 1 ? 'historia' : 'historias'}
+                    </span>
+                  )}
+                  {parentKey && (
+                    <span className="epic-parent-chip" title={`Pertenece a la épica ${parentKey}`}>
+                      Épica {parentKey}
+                    </span>
+                  )}
                 </div>
                 <div className="issue-right">
                   <span className={`priority-${normPriority.toLowerCase()}`} title={`Prioridad: ${normPriority}`}>

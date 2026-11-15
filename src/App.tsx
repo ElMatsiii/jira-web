@@ -108,6 +108,7 @@ export const App: React.FC = () => {
       type: normalizeType(raw.type),
       storyPoints: Number(raw.storyPoints) || 0,
       sprintId: raw.sprintId || '',
+      parentId: raw.parentId || undefined,
       assigneeId: raw.assigneeId || '',
       acceptanceCriteria: raw.acceptanceCriteria || '',
     }));
@@ -269,6 +270,30 @@ export const App: React.FC = () => {
     return result;
   };
 
+  // The AI handlers below are not wrapped in runAction: the AI drawer catches the rejection and
+  // shows the error itself, so it must not also appear in the global banner.
+
+  /** Creates the decomposed epic as an EPIC issue; its stories are then created with its id as parentId. */
+  const handleCreateEpic = async (title: string, description: string) => {
+    const response = await createIssue({
+      variables: {
+        input: {
+          projectId,
+          title,
+          description: description || '',
+          type: typeToId('EPIC'),
+          priority: priorityToId('MEDIUM'),
+          storyPoints: 0,
+          acceptanceCriteria: '',
+        },
+      },
+    });
+    const epic = response.data?.createIssue;
+    if (!epic?.id) throw new Error('No se pudo crear la épica en el backlog.');
+    await issuesQuery.refetch();
+    return { id: String(epic.id), key: String(epic.key || '') };
+  };
+
   const handleCreateSuggestedStory = async (story: {
     title: string;
     description: string;
@@ -276,9 +301,7 @@ export const App: React.FC = () => {
     priority?: string;
     estimatedStoryPoints: number;
     acceptanceCriteriaGherkin: string;
-  }) => {
-    // Not wrapped in runAction: the AI drawer catches the rejection and shows the error itself,
-    // so it must not also appear in the global banner.
+  }, parentId?: string) => {
     await createIssue({
       variables: {
         input: {
@@ -289,6 +312,7 @@ export const App: React.FC = () => {
           priority: priorityToId(story.priority),
           storyPoints: Number(story.estimatedStoryPoints) || 0,
           acceptanceCriteria: story.acceptanceCriteriaGherkin,
+          ...(parentId ? { parentId } : {}),
         },
       },
     });
@@ -408,6 +432,7 @@ export const App: React.FC = () => {
           onClose={() => setAiDrawerOpen(false)}
           onDecomposeEpic={handleDecomposeEpic}
           onCreateStory={handleCreateSuggestedStory}
+          onCreateEpic={handleCreateEpic}
         />
       )}
     </div>

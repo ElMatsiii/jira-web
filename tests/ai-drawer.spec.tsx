@@ -84,7 +84,8 @@ describe('AIAssistantDrawer story review', () => {
     fireEvent.click(within(screen.getByTestId('ai-story-card-1')).getByRole('button', { name: 'Crear' }));
 
     await waitFor(() => expect(onCreateStory).toHaveBeenCalledTimes(1));
-    expect(onCreateStory).toHaveBeenCalledWith(STORIES[1]);
+    // Without onCreateEpic the stories are created without parent.
+    expect(onCreateStory).toHaveBeenCalledWith(STORIES[1], undefined);
     const card = screen.getByTestId('ai-story-card-1');
     expect(await within(card).findByText('✓ Creada en el backlog')).toBeInTheDocument();
     expect(card).toHaveClass('is-created');
@@ -161,7 +162,7 @@ describe('AIAssistantDrawer story review', () => {
     fireEvent.change(within(detail).getByLabelText('Criterios de aceptación (Gherkin)'), { target: { value: 'Scenario: editado' } });
     fireEvent.click(within(detail).getByText('Guardar y crear'));
 
-    await waitFor(() => expect(onCreateStory).toHaveBeenCalledWith({ ...STORIES[2], acceptanceCriteriaGherkin: 'Scenario: editado' }));
+    await waitFor(() => expect(onCreateStory).toHaveBeenCalledWith({ ...STORIES[2], acceptanceCriteriaGherkin: 'Scenario: editado' }, undefined));
     expect(await within(screen.getByTestId('ai-story-card-2')).findByText('✓ Creada en el backlog')).toBeInTheDocument();
   });
 
@@ -215,5 +216,77 @@ describe('AIAssistantDrawer story review', () => {
 
     expect(await screen.findByText('No quedan historias propuestas para esta épica.')).toBeInTheDocument();
     expect(screen.getByText('Historias propuestas (0)')).toBeInTheDocument();
+  });
+});
+
+describe('AIAssistantDrawer epic creation', () => {
+  const generate = async () => {
+    fireEvent.change(screen.getByTestId('input-ai-epic-title'), { target: { value: 'Pagos' } });
+    fireEvent.change(screen.getByTestId('input-ai-epic-desc'), { target: { value: 'Cobros con tarjeta' } });
+    fireEvent.click(screen.getByTestId('btn-ai-decompose-submit'));
+    await screen.findByTestId('ai-decompose-results');
+  };
+  const createButtonOf = (index: number) =>
+    within(screen.getByTestId(`ai-story-card-${index}`)).getByRole('button', { name: 'Crear' });
+
+  it('creates the epic once, before the first story, and links every story to it', async () => {
+    const onCreateEpic = jest.fn().mockResolvedValue({ id: 'epic-1', key: 'PAY-1' });
+    const { onCreateStory } = renderDrawer({ onCreateEpic });
+    await generate();
+    expect(screen.getByTestId('ai-epic-status')).toHaveTextContent('Se creará en el backlog con la primera historia');
+
+    fireEvent.click(screen.getByTestId('btn-ai-create-all'));
+
+    await waitFor(() => expect(onCreateStory).toHaveBeenCalledTimes(3));
+    expect(onCreateEpic).toHaveBeenCalledTimes(1);
+    expect(onCreateEpic).toHaveBeenCalledWith('Pagos con tarjeta', 'Cobros con tarjeta');
+    expect(onCreateStory.mock.calls.map((call) => call[1])).toEqual(['epic-1', 'epic-1', 'epic-1']);
+    expect(await screen.findByText('Creada como PAY-1')).toBeInTheDocument();
+    expect(within(screen.getByTestId('ai-story-card-0')).getByText('✓ Creada en el backlog · épica PAY-1')).toBeInTheDocument();
+  });
+
+  it('reuses the epic when regenerating for the same title and creates a new one for another title', async () => {
+    const onCreateEpic = jest.fn()
+      .mockResolvedValueOnce({ id: 'epic-1', key: 'PAY-1' })
+      .mockResolvedValueOnce({ id: 'epic-2', key: 'PAY-9' });
+    const onDecomposeEpic = jest.fn().mockResolvedValue({ epicTitle: 'Pagos con tarjeta', stories: STORIES });
+    const { onCreateStory } = renderDrawer({ onCreateEpic, onDecomposeEpic });
+    await generate();
+    fireEvent.click(createButtonOf(0));
+    await screen.findByText('Creada como PAY-1');
+
+    // Same epic title: the existing epic is kept.
+    fireEvent.click(screen.getByRole('button', { name: 'Editar épica' }));
+    fireEvent.click(screen.getByTestId('btn-ai-decompose-submit'));
+    await screen.findByText('Creada como PAY-1');
+    fireEvent.click(createButtonOf(0));
+    await waitFor(() => expect(onCreateStory).toHaveBeenCalledTimes(2));
+    expect(onCreateEpic).toHaveBeenCalledTimes(1);
+
+    // Another epic title: a new epic.
+    onDecomposeEpic.mockResolvedValueOnce({ epicTitle: 'Reembolsos', stories: STORIES });
+    fireEvent.click(screen.getByRole('button', { name: 'Editar épica' }));
+    fireEvent.click(screen.getByTestId('btn-ai-decompose-submit'));
+    expect(await screen.findByText('Se creará en el backlog con la primera historia')).toBeInTheDocument();
+    fireEvent.click(createButtonOf(0));
+    await waitFor(() => expect(onCreateStory).toHaveBeenCalledTimes(3));
+    expect(onCreateEpic).toHaveBeenLastCalledWith('Reembolsos', 'Cobros con tarjeta');
+    expect(onCreateStory.mock.calls[2][1]).toBe('epic-2');
+  });
+
+  it('shows the error and keeps the story pending when the epic cannot be created, then retries it', async () => {
+    const onCreateEpic = jest.fn()
+      .mockRejectedValueOnce(new Error('No tienes acceso a este proyecto.'))
+      .mockResolvedValueOnce({ id: 'epic-1', key: 'PAY-1' });
+    const { onCreateStory } = renderDrawer({ onCreateEpic });
+    await generate();
+
+    fireEvent.click(createButtonOf(0));
+    expect(await screen.findByText('No tienes acceso a este proyecto.')).toBeInTheDocument();
+    expect(onCreateStory).not.toHaveBeenCalled();
+
+    fireEvent.click(createButtonOf(0));
+    await waitFor(() => expect(onCreateStory).toHaveBeenCalledWith(STORIES[0], 'epic-1'));
+    expect(onCreateEpic).toHaveBeenCalledTimes(2);
   });
 });

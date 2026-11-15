@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import { AI_DIAGNOSE_METRICS, GET_BURNDOWN_ANALYTICS, GET_PROJECT_WORK_LOGS, LOG_WORK } from '../graphql/client';
+import { buildBurndownGeometry } from '../utils/burndown-chart';
 
 interface Sprint {
   id: string;
@@ -16,6 +17,15 @@ export const HEALTH_DISPLAY: Record<string, { label: string; className: string }
   HEALTHY: { label: 'Saludable', className: 'health-badge is-healthy' },
   AT_RISK: { label: 'En riesgo', className: 'health-badge is-at-risk' },
   CRITICAL: { label: 'Crítico', className: 'health-badge is-critical' },
+  NOT_STARTED: { label: 'Sin iniciar', className: 'health-badge is-not-started' },
+  NO_SCOPE: { label: 'Sin alcance', className: 'health-badge is-no-scope' },
+};
+
+/** Velocity KPI: MS3 averages the last closed sprints; with none, 0 is not a real average. */
+export const formatVelocity = (velocity: number, sampleSize: number | null | undefined): { value: string; hint: string } => {
+  if (sampleSize === 0) return { value: 'Sin sprints cerrados', hint: 'Se calculará al cerrar el primer sprint.' };
+  const hint = sampleSize ? `Promedio de ${sampleSize} sprint${sampleSize === 1 ? '' : 's'} cerrado${sampleSize === 1 ? '' : 's'}` : '';
+  return { value: `${velocity} SP / sprint`, hint };
 };
 
 const renderDiagnosis = (
@@ -35,8 +45,11 @@ const renderDiagnosis = (
 interface BurndownData {
   sprintId: string;
   velocity: number;
+  /** Closed sprints averaged in velocity; 0 = none yet, null = unknown. */
+  velocitySampleSize?: number | null;
   idealBurndown: number[];
-  actualBurndown: number[];
+  /** Aligned with idealBurndown; null for days that have not happened yet. */
+  actualBurndown: (number | null)[];
   blockedCount: number;
   healthStatus: string;
 }
@@ -79,16 +92,11 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint,
   const health = HEALTH_DISPLAY[metrics?.healthStatus || ''] || { label: metrics?.healthStatus || '', className: 'health-badge' };
   const ideal = metrics?.idealBurndown || [];
   const actual = metrics?.actualBurndown || [];
-  const values = [...ideal, ...actual];
-  const maxPoints = Math.max(...values, 1);
   const width = 560;
   const height = 240;
   const padding = 34;
-  const getPoints = (series: number[]) => series.map((value, index) => {
-    const x = padding + (index / Math.max(series.length - 1, 1)) * (width - 2 * padding);
-    const y = height - padding - (value / maxPoints) * (height - 2 * padding);
-    return `${x},${y}`;
-  }).join(' ');
+  const chart = buildBurndownGeometry(ideal, actual, { width, height, padding });
+  const velocity = formatVelocity(metrics?.velocity || 0, metrics?.velocitySampleSize);
 
   const runDiagnosis = async () => {
     setDiagnosisError('');
@@ -161,22 +169,34 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint,
             <section className="chart-card">
               <h2 className="analytics-section-title">{sprint.name} · Burndown</h2>
               <p className="page-subtitle">{sprint.goal || 'Sin objetivo definido'}</p>
-              {ideal.length > 1 && actual.length > 1 ? (
+              {ideal.length > 1 ? (
                 <>
                   <svg viewBox={`0 0 ${width} ${height}`} className="burndown-chart" role="img" aria-label="Gráfico de burndown del sprint">
                     <line className="burndown-axis" x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} />
-                    <polyline className="burndown-ideal" fill="none" strokeDasharray="4 4" strokeWidth="2" points={getPoints(ideal)} />
-                    <polyline className="burndown-actual" fill="none" strokeWidth="2.5" points={getPoints(actual)} />
+                    <polyline className="burndown-ideal" fill="none" strokeDasharray="4 4" strokeWidth="2" points={chart.idealPoints} />
+                    {chart.actualPoints && (
+                      <polyline className="burndown-actual" fill="none" strokeWidth="2.5" points={chart.actualPoints} />
+                    )}
+                    {chart.lastActual && (
+                      <circle className="burndown-today" cx={chart.lastActual.x} cy={chart.lastActual.y} r="4" data-testid="burndown-today" />
+                    )}
                   </svg>
                   <div className="burndown-legend">
                     <span className="burndown-legend-item is-ideal">Ideal</span>
-                    <span className="burndown-legend-item">Real</span>
+                    <span className="burndown-legend-item">Real (hasta hoy)</span>
                   </div>
+                  {!chart.lastActual && (
+                    <p className="page-subtitle">La línea real aparecerá cuando comience el sprint.</p>
+                  )}
                 </>
-              ) : <div className="empty-state-box">El burndown estará disponible cuando se registren cambios de trabajo durante el sprint.</div>}
+              ) : <div className="empty-state-box">El burndown estará disponible cuando el sprint tenga fechas y alcance definidos.</div>}
             </section>
             <section className="analytics-kpis">
-              <div className="stat-box"><span>Velocidad promedio</span><strong>{metrics.velocity} SP / sprint</strong></div>
+              <div className="stat-box">
+                <span>Velocidad promedio</span>
+                <strong data-testid="velocity-value">{velocity.value}</strong>
+                {velocity.hint && <small className="stat-hint">{velocity.hint}</small>}
+              </div>
               <div className="stat-box"><span>Historias bloqueadas</span><strong>{metrics.blockedCount}</strong></div>
               <div className="stat-box">
                 <span>Salud del sprint</span>
