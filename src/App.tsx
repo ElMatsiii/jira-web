@@ -5,6 +5,8 @@ import { Navbar } from './components/Navbar';
 import { CreateIssueModal } from './components/CreateIssueModal';
 import { AIAssistantDrawer } from './components/AIAssistantDrawer';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ProjectMembersPanel } from './components/ProjectMembersPanel';
+import { IssueDetailPanel } from './components/IssueDetailPanel';
 import { BacklogPage, Issue } from './pages/BacklogPage';
 import { BoardPage } from './pages/BoardPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
@@ -17,7 +19,6 @@ import {
   typeToId,
 } from './utils/issue-utils';
 import {
-  ADD_WORKSPACE_MEMBER,
   ASSIGN_ISSUES_TO_SPRINT,
   AI_DECOMPOSE_EPIC,
   AI_IMPROVE_STORY,
@@ -57,7 +58,8 @@ export const App: React.FC = () => {
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [projectName, setProjectName] = useState('');
   const [projectKey, setProjectKey] = useState('');
-  const [memberEmail, setMemberEmail] = useState('');
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [issueModalOpen, setIssueModalOpen] = useState(false);
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -111,6 +113,8 @@ export const App: React.FC = () => {
       parentId: raw.parentId || undefined,
       assigneeId: raw.assigneeId || '',
       acceptanceCriteria: raw.acceptanceCriteria || '',
+      reporterName: raw.reporterName || undefined,
+      createdAt: raw.createdAt || undefined,
     }));
   }, [rawIssues]);
   const sprints: Sprint[] = sprintsQuery.data?.listSprints || [];
@@ -118,7 +122,6 @@ export const App: React.FC = () => {
   const sprintIssues = activeSprint ? issues.filter((issue) => issue.sprintId === activeSprint.id) : [];
 
   const [createProject] = useMutation(CREATE_PROJECT);
-  const [addMember] = useMutation(ADD_WORKSPACE_MEMBER);
   const [createIssue] = useMutation(CREATE_ISSUE);
   const [updateIssueStatus] = useMutation(UPDATE_ISSUE_STATUS);
   const [assignIssuesToSprint] = useMutation(ASSIGN_ISSUES_TO_SPRINT);
@@ -177,11 +180,6 @@ export const App: React.FC = () => {
     setProjectName('');
     setProjectKey('');
     setShowProjectForm(false);
-  });
-
-  const handleAddMember = () => runAction(async () => {
-    await addMember({ variables: { input: { workspaceId, email: memberEmail } } });
-    setMemberEmail('');
   });
 
   const handleCreateIssue = (newIssue: {
@@ -320,6 +318,10 @@ export const App: React.FC = () => {
   };
 
   const queryError = issuesQuery.error || sprintsQuery.error || projectsQuery.error;
+  const canManageWorkspace = ['OWNER', 'ADMIN'].includes(activeWorkspace?.role || '');
+  const selectedIssue = selectedIssueId ? issues.find((issue) => issue.id === selectedIssueId) : undefined;
+  const selectedParent = selectedIssue?.parentId ? issues.find((issue) => issue.id === selectedIssue.parentId) : undefined;
+  const selectedEpic = selectedParent ? { key: selectedParent.key, title: selectedParent.title } : null;
 
   return (
     <div className="app-layout">
@@ -351,14 +353,13 @@ export const App: React.FC = () => {
               {projects.map((item) => <option key={item.id} value={item.id}>{item.key} · {item.name}</option>)}
             </select>
           </label>
-          {['OWNER', 'ADMIN'].includes(activeWorkspace?.role || '') && (
+          {canManageWorkspace && (
             <button className="btn btn-secondary btn-sm" onClick={() => setShowProjectForm((shown) => !shown)} disabled={!workspaceId}>+ Proyecto</button>
           )}
-          {['OWNER', 'ADMIN'].includes(activeWorkspace?.role || '') && (
-            <form className="member-form" onSubmit={(event) => { event.preventDefault(); void handleAddMember(); }}>
-              <input className="form-input" type="email" placeholder="Agregar miembro por email" value={memberEmail} onChange={(event) => setMemberEmail(event.target.value)} aria-label="Email del nuevo miembro" />
-              <button className="btn btn-secondary btn-sm" type="submit" disabled={!memberEmail.trim()}>Invitar</button>
-            </form>
+          {project && (
+            <button className="btn btn-secondary btn-sm" onClick={() => setMembersOpen(true)} data-testid="btn-project-members">
+              Miembros del proyecto
+            </button>
           )}
         </section>
         {showProjectForm && (
@@ -377,7 +378,7 @@ export const App: React.FC = () => {
         {!projectId ? (
           <main className="main-content empty-project-state">
             <h1>{projects.length ? 'Selecciona un proyecto' : 'Crea el primer proyecto de tu equipo'}</h1>
-            <p>Los proyectos, historias y actividad son compartidos con los miembros de este espacio de trabajo.</p>
+            <p>Cada proyecto se comparte con las personas invitadas a él; el propietario y los administradores del espacio ven todos.</p>
             {!projects.length && <button className="btn btn-primary" onClick={() => setShowProjectForm(true)}>Crear proyecto</button>}
           </main>
         ) : (
@@ -390,6 +391,7 @@ export const App: React.FC = () => {
                 onOpenCreateModal={() => setIssueModalOpen(true)}
                 onOpenAiDrawer={() => setAiDrawerOpen(true)}
                 onAssignIssue={handleAssignIssue}
+                onSelectIssue={setSelectedIssueId}
               />
             )}
             {tab === 'board' && (
@@ -419,6 +421,22 @@ export const App: React.FC = () => {
           </ErrorBoundary>
         )}
       </div>
+      {membersOpen && project && (
+        <ProjectMembersPanel
+          projectId={project.id}
+          projectName={project.name}
+          canManage={canManageWorkspace}
+          onClose={() => setMembersOpen(false)}
+        />
+      )}
+      {selectedIssue && (
+        <IssueDetailPanel
+          projectId={projectId}
+          issue={selectedIssue}
+          epic={selectedEpic}
+          onClose={() => setSelectedIssueId(null)}
+        />
+      )}
       <CreateIssueModal
         isOpen={issueModalOpen}
         onClose={() => setIssueModalOpen(false)}

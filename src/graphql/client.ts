@@ -50,9 +50,30 @@ export const CREATE_PROJECT = gql`
   }
 `;
 
-export const ADD_WORKSPACE_MEMBER = gql`
-  mutation AddWorkspaceMember($input: AddWorkspaceMemberInput!) {
-    addWorkspaceMember(input: $input) { id name email }
+export const GET_PROJECT_MEMBERS = gql`
+  query ProjectMembers($projectId: String!) {
+    projectMembers(projectId: $projectId) { id name email role invited }
+  }
+`;
+
+export const ADD_PROJECT_MEMBER = gql`
+  mutation AddProjectMember($input: AddProjectMemberInput!) {
+    addProjectMember(input: $input) { id name email role invited }
+  }
+`;
+
+export const REMOVE_PROJECT_MEMBER = gql`
+  mutation RemoveProjectMember($input: RemoveProjectMemberInput!) {
+    removeProjectMember(input: $input)
+  }
+`;
+
+export const GET_ISSUE_WORK_LOGS = gql`
+  query IssueWorkLogs($projectId: String!, $issueId: String!) {
+    issueWorkLogs(projectId: $projectId, issueId: $issueId) {
+      totalHours
+      entries { id userName hours note loggedAt }
+    }
   }
 `;
 
@@ -105,7 +126,9 @@ export const GET_BACKLOG = gql`
       sprintId
       parentId
       assigneeId
+      reporterName
       acceptanceCriteria
+      createdAt
     }
   }
 `;

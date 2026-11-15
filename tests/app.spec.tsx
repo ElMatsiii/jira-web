@@ -61,6 +61,8 @@ describe('App', () => {
         },
         GetBurndownAnalytics: { getBurndownAnalytics: { sprintId: 'sprint-1', velocity: 5, idealBurndown: [5, 0], actualBurndown: [5, 2], blockedCount: 0, healthStatus: 'HEALTHY' } },
         ProjectWorkLogs: { projectWorkLogs: { totalHours: 0, entries: [] } },
+        ProjectMembers: { projectMembers: [{ id: 'user-1', name: 'Ana', email: 'ana@example.com', role: 'OWNER', invited: false }] },
+        IssueWorkLogs: { issueWorkLogs: { totalHours: 1.5, entries: [{ id: 'log-1', userName: 'Ana', hours: 1.5, note: 'Pruebas', loggedAt: '2026-11-15T12:00:00.000Z' }] } },
       };
       return { data: dataByName[name] || null, loading: false, error: undefined, refetch: jest.fn().mockResolvedValue({}) };
     });
@@ -79,7 +81,8 @@ describe('App', () => {
         AiDecomposeEpic: { aiDecomposeEpic: { epicTitle: 'Épica', stories: [] } },
         AiImproveStory: { aiImproveStory: { storyPoints: 3, acceptanceCriteriaGherkin: 'Given... Then...' } },
         AiBreakdownTask: { aiBreakdownTask: { parentTitle: 'Tarea', subtasks: [] } },
-        AddWorkspaceMember: { addWorkspaceMember: { id: 'user-2', email: 'member@example.com' } },
+        AddProjectMember: { addProjectMember: { id: 'user-2', name: 'Beto', email: 'member@example.com', role: 'MEMBER', invited: true } },
+        RemoveProjectMember: { removeProjectMember: true },
       };
       mutations[name] = mutations[name] || jest.fn().mockResolvedValue({ data: resultByName[name] });
       return [mutations[name], { loading: false, error: undefined }];
@@ -145,7 +148,7 @@ describe('App', () => {
     expect(screen.getByTestId('page-analytics')).toBeInTheDocument();
   });
 
-  it('creates a project and invites a member as workspace owner', async () => {
+  it('creates a project and invites a member to it as workspace owner', async () => {
     window.localStorage.setItem('jira-ai-token', 'test-token');
     renderApp();
 
@@ -157,11 +160,35 @@ describe('App', () => {
       variables: { input: { workspaceId: 'workspace-1', name: 'Nuevo', key: 'NEW1', description: '' } },
     }));
 
-    fireEvent.change(screen.getByLabelText('Email del nuevo miembro'), { target: { value: 'member@example.com' } });
+    // Invitations are per project now: there is no workspace-wide invite in the toolbar.
+    expect(screen.queryByLabelText('Email del nuevo miembro')).not.toBeInTheDocument();
+    // Wait until the project creation finished (it selects the new project), then pick an existing one.
+    await waitFor(() => expect(screen.queryByPlaceholderText('Nombre del proyecto')).not.toBeInTheDocument());
+    await selectProject();
+    fireEvent.click(screen.getByTestId('btn-project-members'));
+    fireEvent.change(screen.getByLabelText('Email de la persona a invitar'), { target: { value: 'member@example.com' } });
     fireEvent.click(screen.getByText('Invitar'));
-    await waitFor(() => expect(mutations.AddWorkspaceMember).toHaveBeenCalledWith({
-      variables: { input: { workspaceId: 'workspace-1', email: 'member@example.com' } },
+    await waitFor(() => expect(mutations.AddProjectMember).toHaveBeenCalledWith({
+      variables: { input: { projectId: 'project-1', email: 'member@example.com' } },
     }));
+    expect(await screen.findByText('Beto ahora tiene acceso a Plataforma.')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Cerrar miembros'));
+    expect(screen.queryByTestId('project-members-overlay')).not.toBeInTheDocument();
+  });
+
+  it('opens the issue detail from the backlog with its epic, author and hours', async () => {
+    window.localStorage.setItem('jira-ai-token', 'test-token');
+    renderApp();
+    await selectProject();
+
+    fireEvent.click(screen.getByTestId('issue-row-PLAT-1'));
+
+    const detail = await screen.findByRole('dialog', { name: /PLAT-1/ });
+    expect(detail).toHaveTextContent('Crear tablero');
+    expect(detail).toHaveTextContent('Tablero del equipo');
+    expect(screen.getByTestId('issue-detail-hours')).toHaveTextContent('1.50 h');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: /PLAT-1/ })).not.toBeInTheDocument();
   });
 
   it('creates an issue from the modal sending numeric type and priority', async () => {
