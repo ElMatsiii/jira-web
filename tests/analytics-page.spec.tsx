@@ -17,12 +17,14 @@ const METRICS = {
 };
 
 let burndown: { data?: unknown; loading?: boolean; error?: Error };
+let burndownRefetch: jest.Mock;
 let workLogs: { data?: unknown; error?: Error; refetch: jest.Mock };
 let diagnose: jest.Mock;
 let logWork: jest.Mock;
 
 beforeEach(() => {
   burndown = { data: { getBurndownAnalytics: METRICS }, loading: false };
+  burndownRefetch = jest.fn().mockResolvedValue({});
   workLogs = {
     data: {
       projectWorkLogs: {
@@ -38,7 +40,7 @@ beforeEach(() => {
   logWork = jest.fn().mockResolvedValue({ data: { logWork: { id: 'w2' } } });
   apollo.useQuery.mockImplementation((doc: any) => {
     const name = operationName(doc);
-    if (name === 'GetBurndownAnalytics') return { loading: false, ...burndown };
+    if (name === 'GetBurndownAnalytics') return { loading: false, refetch: burndownRefetch, ...burndown };
     if (name === 'ProjectWorkLogs') return { loading: false, ...workLogs };
     return { data: undefined, loading: false };
   });
@@ -66,7 +68,8 @@ describe('AnalyticsPage', () => {
     const kpis = container.querySelector('.analytics-kpis') as HTMLElement;
     expect(within(kpis).getByText('21 SP / sprint')).toBeInTheDocument();
     expect(within(kpis).getByText('2')).toBeInTheDocument();
-    expect(within(kpis).getByText('AT_RISK')).toBeInTheDocument();
+    expect(within(kpis).getByTestId('sprint-health')).toHaveTextContent('En riesgo');
+    expect(within(kpis).getByTestId('sprint-health')).toHaveClass('health-badge', 'is-at-risk');
   });
 
   it('explains when there are not enough burndown points to draw the chart', () => {
@@ -152,5 +155,69 @@ describe('AnalyticsPage', () => {
     fireEvent.change(screen.getByLabelText('Historia para registrar tiempo'), { target: { value: 'issue-1' } });
     fireEvent.click(screen.getByText('Registrar tiempo'));
     expect(await screen.findByText('Máximo 24 horas')).toBeInTheDocument();
+  });
+});
+
+describe('AnalyticsPage when analytics are UNAVAILABLE', () => {
+  const UNAVAILABLE = {
+    sprintId: 'sprint-1', velocity: 0, idealBurndown: [], actualBurndown: [], blockedCount: 0, healthStatus: 'UNAVAILABLE',
+  };
+
+  it('explains the outage instead of showing placeholder numbers, and lets the user retry', () => {
+    burndown = { data: { getBurndownAnalytics: UNAVAILABLE } };
+    const { container } = render(<AnalyticsPage projectId="project-1" sprint={SPRINT} issues={ISSUES} />);
+
+    const notice = screen.getByTestId('analytics-unavailable');
+    expect(notice).toHaveAttribute('role', 'status');
+    expect(notice).toHaveTextContent('Métricas no disponibles por ahora');
+    expect(notice).toHaveTextContent('Sprint 1');
+    expect(screen.queryByText('UNAVAILABLE')).not.toBeInTheDocument();
+    expect(screen.queryByText('0 SP / sprint')).not.toBeInTheDocument();
+    expect(container.querySelector('.analytics-kpis')).toBeNull();
+    expect(screen.queryByLabelText('Gráfico de burndown del sprint')).not.toBeInTheDocument();
+
+    fireEvent.click(within(notice).getByText('Reintentar'));
+    expect(burndownRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('still allows the AI diagnosis and shows it below the notice', async () => {
+    burndown = { data: { getBurndownAnalytics: UNAVAILABLE } };
+    render(<AnalyticsPage projectId="project-1" sprint={SPRINT} issues={ISSUES} />);
+
+    fireEvent.click(screen.getByText('Analizar sprint con IA'));
+
+    expect(await screen.findByText('Hay bloqueos')).toBeInTheDocument();
+    expect(diagnose).toHaveBeenCalledWith({ variables: { input: { projectId: 'project-1', sprintId: 'sprint-1', blockedIssuesCount: 0 } } });
+    expect(screen.getByTestId('analytics-unavailable')).toBeInTheDocument();
+  });
+
+  it('shows the diagnosis error in the unavailable state too', async () => {
+    burndown = { data: { getBurndownAnalytics: UNAVAILABLE } };
+    diagnose.mockRejectedValueOnce(new Error('El agente de IA no está disponible'));
+    render(<AnalyticsPage projectId="project-1" sprint={SPRINT} issues={ISSUES} />);
+
+    fireEvent.click(screen.getByText('Analizar sprint con IA'));
+
+    expect(await screen.findByText('El agente de IA no está disponible')).toBeInTheDocument();
+  });
+});
+
+describe('Sprint health badge', () => {
+  it.each([
+    ['HEALTHY', 'Saludable', 'is-healthy'],
+    ['AT_RISK', 'En riesgo', 'is-at-risk'],
+    ['CRITICAL', 'Crítico', 'is-critical'],
+  ])('shows %s as "%s"', (status, label, className) => {
+    burndown = { data: { getBurndownAnalytics: { ...METRICS, healthStatus: status } } };
+    render(<AnalyticsPage projectId="project-1" sprint={SPRINT} issues={ISSUES} />);
+    expect(screen.getByTestId('sprint-health')).toHaveTextContent(label);
+    expect(screen.getByTestId('sprint-health')).toHaveClass('health-badge', className);
+  });
+
+  it('falls back to the raw value for an unknown status', () => {
+    burndown = { data: { getBurndownAnalytics: { ...METRICS, healthStatus: 'ON_TRACK' } } };
+    render(<AnalyticsPage projectId="project-1" sprint={SPRINT} issues={ISSUES} />);
+    expect(screen.getByTestId('sprint-health')).toHaveTextContent('ON_TRACK');
+    expect(screen.getByTestId('sprint-health')).toHaveClass('health-badge');
   });
 });

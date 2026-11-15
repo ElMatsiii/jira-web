@@ -8,6 +8,30 @@ interface Sprint {
   goal: string;
 }
 
+/** healthStatus value the BFF returns when the analytics service (MS3) did not answer. */
+export const HEALTH_UNAVAILABLE = 'UNAVAILABLE';
+
+/** Spanish label and badge style for each sprint health value sent by the BFF. */
+export const HEALTH_DISPLAY: Record<string, { label: string; className: string }> = {
+  HEALTHY: { label: 'Saludable', className: 'health-badge is-healthy' },
+  AT_RISK: { label: 'En riesgo', className: 'health-badge is-at-risk' },
+  CRITICAL: { label: 'Crítico', className: 'health-badge is-critical' },
+};
+
+const renderDiagnosis = (
+  diagnosis: { summary: string; rootCauses: string[]; recommendations: string[] },
+  sprintName: string,
+) => (
+  <section className="ai-diagnosis-card" aria-live="polite">
+    <h2>Recomendaciones para {sprintName}</h2>
+    <p>{diagnosis.summary}</p>
+    {!!diagnosis.rootCauses.length && <h3>Factores detectados</h3>}
+    <ul>{diagnosis.rootCauses.map((item) => <li key={item}>{item}</li>)}</ul>
+    {!!diagnosis.recommendations.length && <h3>Acciones sugeridas</h3>}
+    <ul>{diagnosis.recommendations.map((item) => <li key={item}>{item}</li>)}</ul>
+  </section>
+);
+
 interface BurndownData {
   sprintId: string;
   velocity: number;
@@ -43,13 +67,16 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint,
     fetchPolicy: 'cache-and-network',
   });
   const [recordWork, recordWorkState] = useMutation(LOG_WORK);
-  const { data, loading, error } = useQuery(GET_BURNDOWN_ANALYTICS, {
+  const { data, loading, error, refetch } = useQuery(GET_BURNDOWN_ANALYTICS, {
     variables: { sprintId: sprint?.id || '' },
     skip: !sprint,
     fetchPolicy: 'cache-and-network',
   });
   const [diagnose, diagnoseState] = useMutation(AI_DIAGNOSE_METRICS);
   const metrics: BurndownData | undefined = data?.getBurndownAnalytics;
+  // The BFF answers UNAVAILABLE when MS3 (analytics) did not respond; its numbers are placeholders.
+  const metricsUnavailable = metrics?.healthStatus === HEALTH_UNAVAILABLE;
+  const health = HEALTH_DISPLAY[metrics?.healthStatus || ''] || { label: metrics?.healthStatus || '', className: 'health-badge' };
   const ideal = metrics?.idealBurndown || [];
   const actual = metrics?.actualBurndown || [];
   const values = [...ideal, ...actual];
@@ -113,6 +140,21 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint,
         <section className="app-error" role="alert">No se pudieron cargar las métricas: {error.message}</section>
       ) : !metrics ? (
         <section className="empty-state-box">Todavía no hay datos analíticos para este sprint.</section>
+      ) : metricsUnavailable ? (
+        <>
+          <section className="analytics-unavailable" role="status" data-testid="analytics-unavailable">
+            <h2 className="analytics-section-title">Métricas no disponibles por ahora</h2>
+            <p>
+              El servicio de analítica no respondió a tiempo, así que no hay burndown, velocidad ni salud
+              para {sprint.name}. Los datos del sprint no se perdieron; vuelve a intentarlo en unos momentos.
+            </p>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void refetch()}>
+              Reintentar
+            </button>
+          </section>
+          {diagnosisError && <div className="app-error" role="alert">{diagnosisError}</div>}
+          {diagnosis && renderDiagnosis(diagnosis, sprint.name)}
+        </>
       ) : (
         <>
           <div className="analytics-grid">
@@ -136,20 +178,14 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint,
             <section className="analytics-kpis">
               <div className="stat-box"><span>Velocidad promedio</span><strong>{metrics.velocity} SP / sprint</strong></div>
               <div className="stat-box"><span>Historias bloqueadas</span><strong>{metrics.blockedCount}</strong></div>
-              <div className="stat-box"><span>Salud del sprint</span><strong>{metrics.healthStatus}</strong></div>
+              <div className="stat-box">
+                <span>Salud del sprint</span>
+                <strong><span className={health.className} data-testid="sprint-health">{health.label}</span></strong>
+              </div>
             </section>
           </div>
           {diagnosisError && <div className="app-error" role="alert">{diagnosisError}</div>}
-          {diagnosis && (
-            <section className="ai-diagnosis-card" aria-live="polite">
-              <h2>Recomendaciones para {sprint.name}</h2>
-              <p>{diagnosis.summary}</p>
-              {!!diagnosis.rootCauses.length && <h3>Factores detectados</h3>}
-              <ul>{diagnosis.rootCauses.map((item) => <li key={item}>{item}</li>)}</ul>
-              {!!diagnosis.recommendations.length && <h3>Acciones sugeridas</h3>}
-              <ul>{diagnosis.recommendations.map((item) => <li key={item}>{item}</li>)}</ul>
-            </section>
-          )}
+          {diagnosis && renderDiagnosis(diagnosis, sprint.name)}
         </>
       )}
       <section className="work-log-section">
