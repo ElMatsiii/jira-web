@@ -47,6 +47,90 @@ describe('TimelinePage', () => {
     expect(screen.getByPlaceholderText('Sprint 1')).toHaveValue('Sprint roto');
   });
 
+  describe('sprint duration', () => {
+    const handlers = () => ({ onCreateSprint: jest.fn().mockResolvedValue({}), onStartSprint: jest.fn(), onCompleteSprint: jest.fn() });
+    const startInput = () => screen.getByLabelText('Inicio');
+    const endInput = () => screen.getByLabelText('Fin');
+    const durationSelect = () => screen.getByLabelText('Duración');
+
+    beforeEach(() => {
+      jest.useFakeTimers({ doNotFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'nextTick', 'setImmediate', 'queueMicrotask'] });
+      jest.setSystemTime(new Date(2026, 10, 16, 9, 0)); // Monday 2026-11-16, local time
+    });
+
+    afterEach(() => jest.useRealTimers());
+
+    it('defaults to 2 weeks from today with the end computed inclusively', () => {
+      render(<TimelinePage loading={false} sprints={[]} {...handlers()} />);
+
+      expect(durationSelect()).toHaveValue('2');
+      expect(Array.from((durationSelect() as HTMLSelectElement).options).map((o) => o.text))
+        .toEqual(['1 semana', '2 semanas', '3 semanas', '4 semanas']);
+      expect(startInput()).toHaveValue('2026-11-16');
+      expect(endInput()).toHaveValue('2026-11-29');
+    });
+
+    it('recalculates the end when the start date or the duration changes', () => {
+      render(<TimelinePage loading={false} sprints={[]} {...handlers()} />);
+
+      fireEvent.change(startInput(), { target: { value: '2026-12-01' } });
+      expect(endInput()).toHaveValue('2026-12-14');
+
+      fireEvent.change(durationSelect(), { target: { value: '4' } });
+      expect(endInput()).toHaveValue('2026-12-28');
+
+      fireEvent.change(durationSelect(), { target: { value: '1' } });
+      expect(endInput()).toHaveValue('2026-12-07');
+    });
+
+    it('keeps the end editable by hand and recalculates again when start or duration change', () => {
+      render(<TimelinePage loading={false} sprints={[]} {...handlers()} />);
+
+      fireEvent.change(endInput(), { target: { value: '2026-11-25' } });
+      expect(endInput()).toHaveValue('2026-11-25');
+      expect(screen.getByText(/Fecha de fin ajustada manualmente/)).toBeInTheDocument();
+
+      fireEvent.change(durationSelect(), { target: { value: '3' } });
+      expect(endInput()).toHaveValue('2026-12-06');
+      expect(screen.queryByText(/ajustada manualmente/)).not.toBeInTheDocument();
+    });
+
+    it('rejects an end before the start and does not submit', () => {
+      const props = handlers();
+      render(<TimelinePage loading={false} sprints={[]} {...props} />);
+      fireEvent.change(screen.getByPlaceholderText('Sprint 1'), { target: { value: 'Sprint 9' } });
+
+      fireEvent.change(endInput(), { target: { value: '2026-11-10' } });
+
+      expect(screen.getByRole('alert')).toHaveTextContent('La fecha de fin no puede ser anterior a la fecha de inicio.');
+      expect(endInput()).toHaveAttribute('aria-invalid', 'true');
+      expect(screen.getByText('Crear sprint')).toBeDisabled();
+      fireEvent.submit(screen.getByText('Crear sprint').closest('form') as HTMLFormElement);
+      expect(props.onCreateSprint).not.toHaveBeenCalled();
+    });
+
+    it('sends the chosen start and computed end to onCreateSprint', async () => {
+      const props = handlers();
+      render(<TimelinePage loading={false} sprints={[]} {...props} />);
+      fireEvent.change(screen.getByPlaceholderText('Sprint 1'), { target: { value: 'Sprint 9' } });
+      fireEvent.change(startInput(), { target: { value: '2026-11-23' } });
+      fireEvent.change(durationSelect(), { target: { value: '3' } });
+
+      fireEvent.click(screen.getByText('Crear sprint'));
+
+      await waitFor(() => expect(props.onCreateSprint).toHaveBeenCalledWith({
+        name: 'Sprint 9', goal: '', startDate: '2026-11-23', endDate: '2026-12-13',
+      }));
+    });
+
+    it('keeps the current end while the start field is temporarily empty', () => {
+      render(<TimelinePage loading={false} sprints={[]} {...handlers()} />);
+      fireEvent.change(startInput(), { target: { value: '' } });
+      expect(endInput()).toHaveValue('2026-11-29');
+      expect(screen.getByText('Crear sprint')).toBeDisabled();
+    });
+  });
+
   it('shows loading and empty states', () => {
     const handlers = { onCreateSprint: jest.fn(), onStartSprint: jest.fn(), onCompleteSprint: jest.fn() };
     const { rerender } = render(<TimelinePage loading sprints={[]} {...handlers} />);

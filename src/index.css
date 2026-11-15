@@ -1164,6 +1164,17 @@ select {
   margin-bottom: 0;
 }
 
+.timeline-dates-hint {
+  margin-top: var(--space-sm);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.timeline-dates-hint.form-error {
+  margin-bottom: 0;
+  color: var(--status-blocked-text);
+}
+
 .timeline-sprint {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
