@@ -2878,62 +2878,6 @@ select {
   line-height: 1.5;
 }
 
-.auth-sso-group {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin: 20px 0 12px 0;
-}
-
-.btn-sso {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 12px;
-  border-radius: var(--radius-sm);
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 120ms ease;
-}
-
-.btn-sso:hover {
-  background-color: var(--bg-subtle);
-  border-color: var(--border-prominent);
-}
-
-.auth-divider {
-  position: relative;
-  text-align: center;
-  margin: 20px 0;
-}
-
-.auth-divider::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background-color: var(--border-color);
-}
-
-.auth-divider span {
-  position: relative;
-  background-color: var(--bg-surface);
-  padding: 0 12px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-subtle);
-}
 
 .auth-checkbox-row {
   display: flex;
