@@ -126,6 +126,35 @@ describe('Web Pages Suite', () => {
       fireEvent.click(advanceBtn);
       expect(onUpdateStatus).toHaveBeenCalledWith('issue-4', 'IN_PROGRESS');
 
+      // JIRA-103 is in IN_REVIEW, clicking regress should call with IN_PROGRESS
+      const regressBtn = screen.getByTestId('btn-regress-JIRA-103');
+      fireEvent.click(regressBtn);
+      expect(onUpdateStatus).toHaveBeenCalledWith('issue-3', 'IN_PROGRESS');
+
+      // Direct status selection via dropdown
+      const statusSelect = screen.getByTestId('select-status-JIRA-104');
+      fireEvent.change(statusSelect, { target: { value: 'DONE' } });
+      expect(onUpdateStatus).toHaveBeenCalledWith('issue-4', 'DONE');
+
+      // Drag and Drop simulation
+      const card = screen.getByTestId('card-JIRA-104');
+      fireEvent.dragStart(card, {
+        dataTransfer: {
+          setData: jest.fn(),
+          getData: () => 'issue-4',
+        },
+      });
+      const doneCol = screen.getByTestId('board-column-DONE');
+      fireEvent.dragOver(doneCol, {
+        dataTransfer: { dropEffect: 'move' },
+      });
+      fireEvent.drop(doneCol, {
+        dataTransfer: {
+          getData: () => 'issue-4',
+        },
+      });
+      expect(onUpdateStatus).toHaveBeenCalledWith('issue-4', 'DONE');
+
       // JIRA-101 is in DONE, should show Listo
       expect(screen.getByText('✓ Listo')).toBeInTheDocument();
     });

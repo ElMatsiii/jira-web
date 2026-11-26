@@ -837,6 +837,14 @@ select {
   flex-direction: column;
   min-height: 520px;
   box-shadow: var(--shadow-xs);
+  transition: all 150ms ease;
+}
+
+.kanban-col.is-drag-over {
+  background-color: var(--bg-surface-elevated, rgba(13, 23, 42, 0.04));
+  border-color: var(--color-primary-main, #0d172a);
+  outline: 2px dashed var(--color-primary-main, #0d172a);
+  outline-offset: -2px;
 }
 
 .kanban-col-header {
@@ -870,7 +878,12 @@ select {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-xs);
   transition: all 150ms ease;
-  cursor: pointer;
+  cursor: grab;
+}
+
+.kanban-card:active {
+  cursor: grabbing;
+  opacity: 0.7;
 }
 
 .kanban-card:hover {
@@ -904,6 +917,27 @@ select {
   gap: 8px;
   padding-top: 10px;
   border-top: 1px solid var(--border-color);
+}
+
+.card-actions {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.kanban-status-select {
+  font-size: 0.70rem;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.kanban-status-select:focus {
+  outline: none;
+  border-color: var(--color-primary-main);
 }
 
 /* ==========================================================================
