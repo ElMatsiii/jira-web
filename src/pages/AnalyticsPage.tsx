@@ -3,10 +3,11 @@ import { useMutation, useQuery } from '@apollo/client';
 import { AI_DIAGNOSE_METRICS, GET_BURNDOWN_ANALYTICS, GET_PROJECT_WORK_LOGS, LOG_WORK } from '../graphql/client';
 import { buildBurndownGeometry } from '../utils/burndown-chart';
 
-interface Sprint {
+export interface SprintOption {
   id: string;
   name: string;
-  goal: string;
+  goal?: string;
+  status?: string;
 }
 
 /** healthStatus value the BFF returns when the analytics service (MS3) did not answer. */
@@ -61,19 +62,32 @@ interface Diagnosis {
   healthStatus: string;
 }
 
-interface AnalyticsPageProps {
+export interface AnalyticsPageProps {
   projectId: string;
-  sprint: Sprint | null;
+  sprint: SprintOption | null;
+  sprints?: SprintOption[];
   issues: { id: string; key: string; title: string }[];
 }
 
-export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint, issues }) => {
+export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint, sprints, issues }) => {
+  const availableSprints: SprintOption[] = sprints && sprints.length > 0
+    ? sprints
+    : sprint
+      ? [sprint]
+      : [];
+
+  const defaultSprintId = sprint?.id || availableSprints.find((s) => s.status === 'ACTIVE')?.id || availableSprints[0]?.id || '';
+  const [selectedSprintId, setSelectedSprintId] = useState<string>(defaultSprintId);
+
+  const activeSprintSelection = availableSprints.find((s) => s.id === (selectedSprintId || defaultSprintId)) || sprint || null;
+
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
   const [diagnosisError, setDiagnosisError] = useState('');
   const [issueId, setIssueId] = useState('');
   const [hours, setHours] = useState('1');
   const [workNote, setWorkNote] = useState('');
   const [workError, setWorkError] = useState('');
+
   const workLogs = useQuery(GET_PROJECT_WORK_LOGS, {
     variables: { projectId },
     skip: !projectId,
@@ -81,8 +95,8 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint,
   });
   const [recordWork, recordWorkState] = useMutation(LOG_WORK);
   const { data, loading, error, refetch } = useQuery(GET_BURNDOWN_ANALYTICS, {
-    variables: { sprintId: sprint?.id || '' },
-    skip: !sprint,
+    variables: { sprintId: activeSprintSelection?.id || '' },
+    skip: !activeSprintSelection,
     fetchPolicy: 'cache-and-network',
   });
   const [diagnose, diagnoseState] = useMutation(AI_DIAGNOSE_METRICS);
@@ -99,12 +113,13 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint,
   const velocity = formatVelocity(metrics?.velocity || 0, metrics?.velocitySampleSize);
 
   const runDiagnosis = async () => {
+    if (!activeSprintSelection) return;
     setDiagnosisError('');
     setDiagnosis(null);
     try {
       const result = await diagnose({
         variables: {
-          input: { projectId, sprintId: sprint?.id, blockedIssuesCount: metrics?.blockedCount || 0 },
+          input: { projectId, sprintId: activeSprintSelection.id, blockedIssuesCount: metrics?.blockedCount || 0 },
         },
       });
       setDiagnosis(result.data?.aiDiagnoseMetrics || null);
@@ -134,16 +149,51 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint,
           <h1 className="page-title">Rendimiento del proyecto</h1>
           <p className="page-subtitle">Métricas reales del sprint seleccionado; la IA puede señalar riesgos y proponer acciones.</p>
         </div>
-        {sprint && (
+        {activeSprintSelection && (
           <button className="btn btn-ai" onClick={() => void runDiagnosis()} disabled={diagnoseState.loading || loading}>
             {diagnoseState.loading ? 'Analizando...' : 'Analizar sprint con IA'}
           </button>
         )}
       </header>
-      {!sprint ? (
+
+      {availableSprints.length > 0 && (
+        <div className="analytics-sprint-picker">
+          <label htmlFor="sprint-select" className="analytics-sprint-picker-label">
+            Sprint:
+          </label>
+          <select
+            id="sprint-select"
+            className="form-select analytics-sprint-select"
+            data-testid="select-sprint-analytics"
+            value={activeSprintSelection?.id || ''}
+            onChange={(event) => {
+              setSelectedSprintId(event.target.value);
+              setDiagnosis(null);
+              setDiagnosisError('');
+            }}
+          >
+            {availableSprints.map((s) => {
+              const tag = s.status === 'ACTIVE'
+                ? ' (Activo)'
+                : s.status === 'COMPLETED'
+                ? ' (Completado)'
+                : s.status === 'PLANNED'
+                ? ' (Planificado)'
+                : '';
+              return (
+                <option key={s.id} value={s.id}>
+                  {s.name}{tag}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+      )}
+
+      {!activeSprintSelection ? (
         <section className="empty-state-box">Crea e inicia un sprint en Cronograma para ver métricas y análisis.</section>
       ) : loading && !metrics ? (
-        <section className="empty-state-box">Cargando métricas del sprint {sprint.name}...</section>
+        <section className="empty-state-box">Cargando métricas del sprint {activeSprintSelection.name}...</section>
       ) : error ? (
         <section className="app-error" role="alert">No se pudieron cargar las métricas: {error.message}</section>
       ) : !metrics ? (
@@ -154,21 +204,21 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint,
             <h2 className="analytics-section-title">Métricas no disponibles por ahora</h2>
             <p>
               El servicio de analítica no respondió a tiempo, así que no hay burndown, velocidad ni salud
-              para {sprint.name}. Los datos del sprint no se perdieron; vuelve a intentarlo en unos momentos.
+              para {activeSprintSelection.name}. Los datos del sprint no se perdieron; vuelve a intentarlo en unos momentos.
             </p>
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => void refetch()}>
               Reintentar
             </button>
           </section>
           {diagnosisError && <div className="app-error" role="alert">{diagnosisError}</div>}
-          {diagnosis && renderDiagnosis(diagnosis, sprint.name)}
+          {diagnosis && renderDiagnosis(diagnosis, activeSprintSelection.name)}
         </>
       ) : (
         <>
           <div className="analytics-grid">
             <section className="chart-card">
-              <h2 className="analytics-section-title">{sprint.name} · Burndown</h2>
-              <p className="page-subtitle">{sprint.goal || 'Sin objetivo definido'}</p>
+              <h2 className="analytics-section-title">{activeSprintSelection.name} · Burndown</h2>
+              <p className="page-subtitle">{activeSprintSelection.goal || 'Sin objetivo definido'}</p>
               {ideal.length > 1 ? (
                 <>
                   <svg viewBox={`0 0 ${width} ${height}`} className="burndown-chart" role="img" aria-label="Gráfico de burndown del sprint">
@@ -205,7 +255,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint,
             </section>
           </div>
           {diagnosisError && <div className="app-error" role="alert">{diagnosisError}</div>}
-          {diagnosis && renderDiagnosis(diagnosis, sprint.name)}
+          {diagnosis && renderDiagnosis(diagnosis, activeSprintSelection.name)}
         </>
       )}
       <section className="work-log-section">

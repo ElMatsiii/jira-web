@@ -232,6 +232,30 @@ describe('AnalyticsPage when analytics are UNAVAILABLE', () => {
 
     expect(await screen.findByText('El agente de IA no está disponible')).toBeInTheDocument();
   });
+
+  it('allows selecting previous completed sprints and diagnoses the chosen sprint', async () => {
+    const SPRINTS_LIST = [
+      { id: 'sprint-1', name: 'Sprint 1', goal: 'MVP', status: 'ACTIVE' },
+      { id: 'sprint-0', name: 'Sprint 0', goal: 'Arquitectura base', status: 'COMPLETED' },
+    ];
+    render(<AnalyticsPage projectId="project-1" sprint={SPRINTS_LIST[0]} sprints={SPRINTS_LIST} issues={ISSUES} />);
+
+    const select = screen.getByTestId('select-sprint-analytics') as HTMLSelectElement;
+    expect(select).toBeInTheDocument();
+    expect(select.value).toBe('sprint-1');
+
+    fireEvent.change(select, { target: { value: 'sprint-0' } });
+    expect(select.value).toBe('sprint-0');
+    expect(screen.getByText('Sprint 0 · Burndown')).toBeInTheDocument();
+    expect(screen.getByText('Arquitectura base')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Analizar sprint con IA'));
+    await waitFor(() => {
+      expect(diagnose).toHaveBeenCalledWith({
+        variables: { input: { projectId: 'project-1', sprintId: 'sprint-0', blockedIssuesCount: 2 } },
+      });
+    });
+  });
 });
 
 describe('Sprint health badge', () => {

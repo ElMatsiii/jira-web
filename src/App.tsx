@@ -415,6 +415,7 @@ export const App: React.FC = () => {
               <AnalyticsPage
                 projectId={projectId}
                 sprint={activeSprint || null}
+                sprints={sprints}
                 issues={issues}
               />
             )}
