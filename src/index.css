@@ -1323,6 +1323,8 @@ select {
 .chart-card,
 .analytics-kpis .stat-box,
 .ai-diagnosis-card,
+.ai-retrospective-card,
+.velocity-trend-section,
 .work-log-section {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
@@ -1727,6 +1729,100 @@ select {
   padding-left: var(--space-lg);
   color: var(--text-body);
   line-height: 1.5;
+}
+
+.ai-retrospective-card {
+  margin-top: var(--space-lg);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-lg) var(--space-xl);
+  border-left: 3px solid var(--primary-brand);
+}
+
+.ai-retrospective-card h2 {
+  margin-bottom: var(--space-md);
+  font-size: 1.05rem;
+  color: var(--text-main);
+}
+
+.ai-retrospective-card p {
+  color: var(--text-body);
+  line-height: 1.5;
+}
+
+.ai-retrospective-card h3 {
+  margin: var(--space-md) 0 var(--space-xs);
+  font-size: 0.9rem;
+  color: var(--text-main);
+}
+
+.ai-retrospective-card ul {
+  padding-left: var(--space-lg);
+  color: var(--text-body);
+  line-height: 1.5;
+}
+
+.velocity-trend-section {
+  padding: var(--space-lg) var(--space-xl);
+  margin-bottom: var(--space-lg);
+}
+
+.velocity-trend-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.velocity-trend-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.velocity-history-table-wrapper {
+  overflow-x: auto;
+}
+
+.velocity-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  text-align: left;
+}
+
+.velocity-history-table th {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 2px solid var(--border-color);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.velocity-history-table td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-body);
+}
+
+.compliance-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.compliance-tag.is-good,
+.is-good {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+.compliance-tag.is-warning,
+.is-warning {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #d97706;
 }
 
 .work-log-section {

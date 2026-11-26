@@ -416,6 +416,7 @@ export const App: React.FC = () => {
             {tab === 'analytics' && (
               <AnalyticsPage
                 projectId={projectId}
+                projectKey={project?.key}
                 sprint={activeSprint || null}
                 sprints={sprints}
                 issues={issues}

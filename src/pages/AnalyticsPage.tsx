@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
-import { AI_DIAGNOSE_METRICS, GET_BURNDOWN_ANALYTICS, GET_PROJECT_WORK_LOGS, LOG_WORK } from '../graphql/client';
+import { AI_DIAGNOSE_METRICS, AI_PROJECT_RETROSPECTIVE, GET_BURNDOWN_ANALYTICS, GET_PROJECT_VELOCITY_TREND, GET_PROJECT_WORK_LOGS, LOG_WORK } from '../graphql/client';
 import { buildBurndownGeometry } from '../utils/burndown-chart';
 
 export interface SprintOption {
@@ -64,12 +64,38 @@ interface Diagnosis {
 
 export interface AnalyticsPageProps {
   projectId: string;
+  projectKey?: string;
   sprint: SprintOption | null;
   sprints?: SprintOption[];
   issues: { id: string; key: string; title: string }[];
 }
 
-export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint, sprints, issues }) => {
+export interface VelocityHistoryEntry {
+  sprintId: string;
+  sprintName: string;
+  committedStoryPoints: number;
+  completedStoryPoints: number;
+  completedDate: string;
+}
+
+export interface ProjectVelocityTrendData {
+  projectId: string;
+  velocity: number;
+  velocitySampleSize: number | null;
+  totalPoints: number;
+  completedPoints: number;
+  velocityHistory: VelocityHistoryEntry[];
+}
+
+export interface AiProjectRetrospectiveData {
+  projectId: string;
+  summary: string;
+  strengths: string[];
+  areasForImprovement: string[];
+  actionableRecommendations: string[];
+}
+
+export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, projectKey, sprint, sprints, issues }) => {
   const availableSprints: SprintOption[] = sprints && sprints.length > 0
     ? sprints
     : sprint
@@ -87,6 +113,17 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint,
   const [hours, setHours] = useState('1');
   const [workNote, setWorkNote] = useState('');
   const [workError, setWorkError] = useState('');
+
+  const [retrospective, setRetrospective] = useState<AiProjectRetrospectiveData | null>(null);
+  const [retrospectiveError, setRetrospectiveError] = useState('');
+
+  const { data: trendData, loading: trendLoading } = useQuery(GET_PROJECT_VELOCITY_TREND, {
+    variables: { projectId },
+    skip: !projectId,
+    fetchPolicy: 'cache-and-network',
+  });
+  const [generateRetrospective, retrospectiveState] = useMutation(AI_PROJECT_RETROSPECTIVE);
+  const trend: ProjectVelocityTrendData | undefined = trendData?.getProjectVelocityTrend;
 
   const workLogs = useQuery(GET_PROJECT_WORK_LOGS, {
     variables: { projectId },
@@ -125,6 +162,24 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint,
       setDiagnosis(result.data?.aiDiagnoseMetrics || null);
     } catch (requestError) {
       setDiagnosisError(requestError instanceof Error ? requestError.message : 'No se pudo analizar el sprint.');
+    }
+  };
+
+  const runProjectRetrospective = async () => {
+    if (!projectId) return;
+    setRetrospectiveError('');
+    setRetrospective(null);
+    try {
+      const result = await generateRetrospective({
+        variables: {
+          input: { projectId, projectKey },
+        },
+      });
+      setRetrospective(result.data?.aiProjectRetrospective || null);
+    } catch (requestError) {
+      setRetrospectiveError(
+        requestError instanceof Error ? requestError.message : 'No se pudo generar la retrospectiva del proyecto.'
+      );
     }
   };
 
@@ -258,6 +313,121 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ projectId, sprint,
           {diagnosis && renderDiagnosis(diagnosis, activeSprintSelection.name)}
         </>
       )}
+
+      <section className="velocity-trend-section" data-testid="velocity-trend-section">
+        <div className="velocity-trend-header">
+          <div>
+            <h2 className="analytics-section-title">Tendencia histórica del proyecto</h2>
+            <p className="page-subtitle">
+              Historial de velocidad de los sprints cerrados del proyecto para calibrar capacidad y generar retrospectivas con IA.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-ai"
+            data-testid="btn-project-retrospective"
+            onClick={() => void runProjectRetrospective()}
+            disabled={retrospectiveState.loading}
+          >
+            {retrospectiveState.loading ? 'Generando retrospectiva...' : 'Generar retrospectiva con IA'}
+          </button>
+        </div>
+
+        {trendLoading && !trend ? (
+          <div className="empty-state-box">Cargando tendencia del proyecto...</div>
+        ) : trend?.velocityHistory && trend.velocityHistory.length > 0 ? (
+          <>
+            <div className="velocity-trend-summary">
+              <div className="stat-box">
+                <span>Velocidad media (reciente)</span>
+                <strong>{trend.velocity} SP</strong>
+                {trend.velocitySampleSize && (
+                  <small className="stat-hint">Calculada sobre {trend.velocitySampleSize} sprint(s)</small>
+                )}
+              </div>
+              <div className="stat-box">
+                <span>Total completado histórico</span>
+                <strong>{trend.completedPoints} SP</strong>
+                <small className="stat-hint">De {trend.totalPoints} SP comprometidos</small>
+              </div>
+              <div className="stat-box">
+                <span>Efectividad global</span>
+                <strong>
+                  {trend.totalPoints > 0
+                    ? `${Math.round((trend.completedPoints / trend.totalPoints) * 100)}%`
+                    : '100%'}
+                </strong>
+              </div>
+            </div>
+
+            <div className="velocity-history-table-wrapper">
+              <table className="velocity-history-table" data-testid="velocity-history-table">
+                <thead>
+                  <tr>
+                    <th>Sprint</th>
+                    <th>Fecha cierre</th>
+                    <th>Comprometidos</th>
+                    <th>Completados</th>
+                    <th>Efectividad</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trend.velocityHistory.map((item: VelocityHistoryEntry) => {
+                    const eff = item.committedStoryPoints > 0
+                      ? Math.round((item.completedStoryPoints / item.committedStoryPoints) * 100)
+                      : 100;
+                    return (
+                      <tr key={item.sprintId}>
+                        <td><strong>{item.sprintName}</strong></td>
+                        <td>{item.completedDate ? new Date(item.completedDate).toLocaleDateString() : '-'}</td>
+                        <td>{item.committedStoryPoints} SP</td>
+                        <td>{item.completedStoryPoints} SP</td>
+                        <td>
+                          <span className={`compliance-tag ${eff >= 80 ? 'is-good' : 'is-warning'}`}>
+                            {eff}%
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <div className="empty-state-box">
+            Aún no hay sprints completados en este proyecto. Al cerrar sprints se registrará la velocidad y la tendencia histórica.
+          </div>
+        )}
+
+        {retrospectiveError && <div className="app-error" role="alert">{retrospectiveError}</div>}
+
+        {retrospective && (
+          <section className="ai-retrospective-card" data-testid="ai-retrospective-card" aria-live="polite">
+            <h2>Retrospectiva del proyecto con IA</h2>
+            <p>{retrospective.summary}</p>
+            {retrospective.strengths.length > 0 && <h3>Fortalezas del equipo</h3>}
+            <ul>
+              {retrospective.strengths.map((s) => (
+                <li key={s}>{s}</li>
+              ))}
+            </ul>
+            {retrospective.areasForImprovement.length > 0 && <h3>Áreas de mejora</h3>}
+            <ul>
+              {retrospective.areasForImprovement.map((a) => (
+                <li key={a}>{a}</li>
+              ))}
+            </ul>
+            {retrospective.actionableRecommendations.length > 0 && <h3>Acciones recomendadas</h3>}
+            <ul>
+              {retrospective.actionableRecommendations.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </section>
+
       <section className="work-log-section">
         <div className="work-log-heading">
           <div>

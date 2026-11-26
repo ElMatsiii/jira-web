@@ -21,6 +21,8 @@ let burndownRefetch: jest.Mock;
 let workLogs: { data?: unknown; error?: Error; refetch: jest.Mock };
 let diagnose: jest.Mock;
 let logWork: jest.Mock;
+let trend: { data?: unknown; loading?: boolean; error?: Error };
+let retrospective: jest.Mock;
 
 beforeEach(() => {
   burndown = { data: { getBurndownAnalytics: METRICS }, loading: false };
@@ -38,15 +40,57 @@ beforeEach(() => {
     data: { aiDiagnoseMetrics: { sprintId: 'sprint-1', healthStatus: 'AT_RISK', summary: 'Hay bloqueos', rootCauses: ['Dependencia externa'], recommendations: ['Hacer swarming'] } },
   });
   logWork = jest.fn().mockResolvedValue({ data: { logWork: { id: 'w2' } } });
+  trend = {
+    data: {
+      getProjectVelocityTrend: {
+        projectId: 'project-1',
+        velocity: 28.5,
+        velocitySampleSize: 2,
+        totalPoints: 60,
+        completedPoints: 55,
+        velocityHistory: [
+          {
+            sprintId: 'sp-1',
+            sprintName: 'Sprint 1',
+            committedStoryPoints: 30,
+            completedStoryPoints: 27,
+            completedDate: '2026-11-01T00:00:00Z',
+          },
+          {
+            sprintId: 'sp-2',
+            sprintName: 'Sprint 2',
+            committedStoryPoints: 30,
+            completedStoryPoints: 28,
+            completedDate: '2026-11-15T00:00:00Z',
+          },
+        ],
+      },
+    },
+    loading: false,
+  };
+  retrospective = jest.fn().mockResolvedValue({
+    data: {
+      aiProjectRetrospective: {
+        projectId: 'project-1',
+        summary: 'Alta cadencia y buena predictibilidad.',
+        strengths: ['Velocidad consistente de 28.5 SP'],
+        areasForImprovement: ['Diferencia minima de 5 SP'],
+        actionableRecommendations: ['Mantener la capacidad en 28 SP'],
+      },
+    },
+  });
+
   apollo.useQuery.mockImplementation((doc: any) => {
     const name = operationName(doc);
     if (name === 'GetBurndownAnalytics') return { loading: false, refetch: burndownRefetch, ...burndown };
     if (name === 'ProjectWorkLogs') return { loading: false, ...workLogs };
+    if (name === 'GetProjectVelocityTrend') return { loading: false, ...trend };
     return { data: undefined, loading: false };
   });
   apollo.useMutation.mockImplementation((doc: any) => {
     const name = operationName(doc);
     if (name === 'AiDiagnoseMetrics') return [diagnose, { loading: false }];
+    if (name === 'AiProjectRetrospective') return [retrospective, { loading: false }];
     return [logWork, { loading: false }];
   });
 });
@@ -255,6 +299,38 @@ describe('AnalyticsPage when analytics are UNAVAILABLE', () => {
         variables: { input: { projectId: 'project-1', sprintId: 'sprint-0', blockedIssuesCount: 2 } },
       });
     });
+  });
+
+  it('renders project velocity trend table and historical stats', () => {
+    render(<AnalyticsPage projectId="project-1" projectKey="PROJ" sprint={SPRINT} issues={ISSUES} />);
+
+    expect(screen.getByTestId('velocity-trend-section')).toBeInTheDocument();
+    expect(screen.getByText('Tendencia histórica del proyecto')).toBeInTheDocument();
+    const table = screen.getByTestId('velocity-history-table');
+    expect(table).toBeInTheDocument();
+    expect(within(table).getByText('Sprint 1')).toBeInTheDocument();
+    expect(within(table).getByText('Sprint 2')).toBeInTheDocument();
+    expect(screen.getByText('28.5 SP')).toBeInTheDocument();
+  });
+
+  it('triggers AI project retrospective and renders result card', async () => {
+    render(<AnalyticsPage projectId="project-1" projectKey="PROJ" sprint={SPRINT} issues={ISSUES} />);
+
+    const retroBtn = screen.getByTestId('btn-project-retrospective');
+    expect(retroBtn).toBeInTheDocument();
+
+    fireEvent.click(retroBtn);
+
+    await waitFor(() => {
+      expect(retrospective).toHaveBeenCalledWith({
+        variables: { input: { projectId: 'project-1', projectKey: 'PROJ' } },
+      });
+    });
+
+    expect(await screen.findByTestId('ai-retrospective-card')).toBeInTheDocument();
+    expect(screen.getByText('Retrospectiva del proyecto con IA')).toBeInTheDocument();
+    expect(screen.getByText('Alta cadencia y buena predictibilidad.')).toBeInTheDocument();
+    expect(screen.getByText('Velocidad consistente de 28.5 SP')).toBeInTheDocument();
   });
 });
 

@@ -240,6 +240,37 @@ export const AI_BREAKDOWN_TASK = gql`
   }
 `;
 
+export const GET_PROJECT_VELOCITY_TREND = gql`
+  query GetProjectVelocityTrend($projectId: String!) {
+    getProjectVelocityTrend(projectId: $projectId) {
+      projectId
+      velocity
+      velocitySampleSize
+      totalPoints
+      completedPoints
+      velocityHistory {
+        sprintId
+        sprintName
+        committedStoryPoints
+        completedStoryPoints
+        completedDate
+      }
+    }
+  }
+`;
+
+export const AI_PROJECT_RETROSPECTIVE = gql`
+  mutation AiProjectRetrospective($input: ProjectRetrospectiveInput!) {
+    aiProjectRetrospective(input: $input) {
+      projectId
+      summary
+      strengths
+      areasForImprovement
+      actionableRecommendations
+    }
+  }
+`;
+
 export function createApolloClient(customUri?: string) {
   const uri = customUri || (typeof window !== 'undefined' && (window as any).__GRAPHQL_URL__) || 'http://localhost:4000/graphql';
   const fetchFn = (typeof window !== 'undefined' && window.fetch) || (typeof global !== 'undefined' && (global as any).fetch) || (globalThis as any).fetch || (() => Promise.resolve(new Response()));
