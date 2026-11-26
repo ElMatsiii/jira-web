@@ -251,19 +251,6 @@ code, kbd, samp, pre {
   gap: var(--space-sm);
 }
 
-.status-indicator-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-accent-sage);
-  background-color: var(--bg-subtle);
-  border: 1px solid var(--border-color);
-  padding: 4px 10px;
-  border-radius: var(--radius-full);
-}
 
 .pulse-dot {
   width: 7px;
@@ -467,13 +454,6 @@ code, kbd, samp, pre {
   color: var(--text-muted);
 }
 
-.sidebar-pill-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--color-accent-sand);
-  margin-right: 6px;
-}
 
 /* ==========================================================================
    Main Viewport Canvas (.app-main-viewport) — Crema Pergamino Base

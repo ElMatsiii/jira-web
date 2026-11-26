@@ -514,7 +514,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
             disabled={isSubmitting || !draft.title.trim()}
             data-testid={isPrimaryCard ? 'btn-submit-issue' : `btn-submit-issue-${index}`}
           >
-            {isSubmitting ? 'Creando...' : 'Crear en Microservicio Go'}
+            {isSubmitting ? 'Creando...' : 'Crear Incidencia'}
           </button>
         </div>
       </form>
@@ -535,7 +535,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
             <div>
               <h2 id="create-issue-heading" className="create-issue-title">Crear Nueva Incidencia</h2>
               <p className="create-issue-subtitle">
-                Registrada en el Microservicio MS1 (Go + PostgreSQL) vía GraphQL BFF
+                Completa los datos para registrar la incidencia.
               </p>
             </div>
             <span className={`modal-grid-counter-badge ${drafts.length >= MAX_DRAFTS ? 'limit' : ''}`}>

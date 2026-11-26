@@ -35,17 +35,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="nav-brand-icon" aria-hidden="true">
             Δ
           </div>
-          <span>Project Aurora <strong>Jira AI</strong></span>
-          <span className="nav-badge-enterprise">Crema & Navy</span>
+          <span><strong>JIRAN'T</strong></span>
         </div>
 
         <div className="nav-actions">
-          {/* Microservices Cluster Live Status */}
-          <div className="status-indicator-pill" title="Microservicios en ejecución (Docker)">
-            <span className="pulse-dot"></span>
-            <span>BFF & Kafka Live</span>
-          </div>
-
           <button
             className="btn btn-ai"
             onClick={onToggleAiDrawer}
@@ -157,10 +150,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <div className="sidebar-footer">
           <div className="sidebar-pill">
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <span className="sidebar-pill-dot"></span>
-              <span>Project Aurora</span>
-            </div>
+            <span>Workspace</span>
             <span style={{ fontSize: '10px' }}>v2.4</span>
           </div>
         </div>

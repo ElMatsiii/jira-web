@@ -71,10 +71,9 @@ export const BacklogPage: React.FC<BacklogPageProps> = ({
         <div>
           <h1 className="page-title">
             <span>Backlog del Producto</span>
-            <span className="nav-badge-enterprise">MS1 • Go</span>
           </h1>
           <p className="page-subtitle">
-            Gestión centralizada de requerimientos alimentada por el Microservicio MS1 (Go + PostgreSQL) y sincronizada vía gRPC con el BFF.
+            Gestión centralizada de requerimientos y priorización del trabajo.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>

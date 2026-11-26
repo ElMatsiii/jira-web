@@ -39,15 +39,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
       {/* Top Bar Minimalista de la Plataforma */}
       <header className="auth-topbar" role="banner">
         <div className="nav-brand">
-          <div className="nav-brand-icon" aria-hidden="true">A</div>
-          <span>Project Aurora <strong>Jira AI</strong></span>
+          <div className="nav-brand-icon" aria-hidden="true">J</div>
+          <span><strong>JIRAN'T</strong></span>
           <span className="nav-badge-enterprise">Software Delivery Platform</span>
         </div>
         <div className="nav-actions">
-          <div className="status-indicator-pill" title="Red de microservicios activa">
-            <span className="pulse-dot"></span>
-            <span>Red Operativa Sincronizada</span>
-          </div>
           <span className="nav-badge-enterprise">Centro de Asistencia</span>
         </div>
       </header>
@@ -83,12 +79,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
                   </svg>
                   <strong style={{ fontSize: '13px', color: 'var(--text-main)' }}>Espacio de Trabajo Conectado</strong>
                 </div>
-                <span className="nav-badge-enterprise">Aurora Core v4.8</span>
+                <span className="nav-badge-enterprise">JIRAN'T Core v4.8</span>
               </div>
 
               <div className="auth-preview-visual">
                 <div style={{ fontSize: '11px', color: '#94A3B8', fontFamily: 'var(--font-mono)' }}>
-                  CLÚSTER JIRA AI • DOCKER KAFKA
+                  ÁREA DE TRABAJO ÁGIL
                 </div>
                 <div style={{ background: 'rgba(255, 255, 255, 0.08)', padding: '12px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: '#FBF8F2' }}>Sprint 14 en curso</div>
@@ -250,10 +246,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
         <div className="auth-footer-inner">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontFamily: 'var(--font-headline)', fontWeight: 600, color: 'var(--text-main)', fontSize: '14px' }}>
-              Project Aurora
+              JIRAN'T
             </span>
             <span style={{ color: 'var(--border-prominent)' }}>/</span>
-            <span>Atlassian Agile Ecosystem</span>
+            <span>Plataforma Ágil</span>
             <span className="nav-badge-enterprise">Build 2025.4.1</span>
           </div>
           <div style={{ display: 'flex', gap: '16px' }}>

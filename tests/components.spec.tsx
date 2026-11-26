@@ -21,7 +21,7 @@ describe('Web Components Suite', () => {
         />
       );
 
-      expect(screen.getByText(/Jira/i)).toBeInTheDocument();
+      expect(screen.getByText(/JIRAN'T/i)).toBeInTheDocument();
       expect(screen.getByTestId('tab-backlog')).toHaveClass('active');
       expect(screen.getByTestId('tab-board')).not.toHaveClass('active');
 
