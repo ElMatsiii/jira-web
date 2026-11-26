@@ -119,7 +119,7 @@ describe('TimelinePage', () => {
       fireEvent.click(screen.getByText('Crear sprint'));
 
       await waitFor(() => expect(props.onCreateSprint).toHaveBeenCalledWith({
-        name: 'Sprint 9', goal: '', startDate: '2026-11-23', endDate: '2026-12-13',
+        name: 'Sprint 9', goal: '', startDate: '2026-11-23', endDate: '2026-12-13', capacityStoryPoints: 0,
       }));
     });
 
@@ -137,5 +137,71 @@ describe('TimelinePage', () => {
     expect(screen.getByText('Cargando cronograma...')).toBeInTheDocument();
     rerender(<TimelinePage loading={false} sprints={[]} {...handlers} />);
     expect(screen.getByText(/Todavía no hay sprints/)).toBeInTheDocument();
+  });
+
+  it('records capacity in story points and displays overcapacity warning', async () => {
+    const onCreateSprint = jest.fn().mockResolvedValue({});
+    render(
+      <TimelinePage
+        loading={false}
+        sprints={[
+          {
+            id: 'over',
+            name: 'Sprint Sobrecargado',
+            goal: 'Mucho alcance',
+            status: 'PLANNED',
+            startDate: '2026-11-12',
+            endDate: '2026-11-26',
+            totalStoryPoints: 45,
+            completedStoryPoints: 0,
+            capacityStoryPoints: 30,
+          },
+        ]}
+        onCreateSprint={onCreateSprint}
+        onStartSprint={jest.fn()}
+        onCompleteSprint={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Alcance (45 SP) supera la capacidad (30 SP)')).toBeInTheDocument();
+    expect(screen.getByText('0/45 SP · Cap: 30 SP')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Sprint 1'), { target: { value: 'Sprint con Capacidad' } });
+    fireEvent.change(screen.getByPlaceholderText('Ej: 30'), { target: { value: '35' } });
+    fireEvent.click(screen.getByText('Crear sprint'));
+
+    await waitFor(() => {
+      expect(onCreateSprint).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Sprint con Capacidad', capacityStoryPoints: 35 }),
+      );
+    });
+  });
+
+  it('restricts sprint management when canManageSprints is false', () => {
+    render(
+      <TimelinePage
+        loading={false}
+        canManageSprints={false}
+        sprints={[
+          {
+            id: 's1',
+            name: 'Sprint 1',
+            goal: 'Goal',
+            status: 'PLANNED',
+            startDate: '2026-11-12',
+            endDate: '2026-11-26',
+            totalStoryPoints: 10,
+            completedStoryPoints: 0,
+          },
+        ]}
+        onCreateSprint={jest.fn()}
+        onStartSprint={jest.fn()}
+        onCompleteSprint={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/Solo el OWNER o un ADMIN del proyecto pueden crear, iniciar o completar sprints/)).toBeInTheDocument();
+    expect(screen.queryByText('Crear sprint')).not.toBeInTheDocument();
+    expect(screen.queryByText('Iniciar sprint')).not.toBeInTheDocument();
   });
 });

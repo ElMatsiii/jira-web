@@ -215,7 +215,7 @@ export const App: React.FC = () => {
     await sprintsQuery.refetch();
   });
 
-  const handleCreateSprint = (input: { name: string; goal: string; startDate: string; endDate: string }) =>
+  const handleCreateSprint = (input: { name: string; goal: string; startDate: string; endDate: string; capacityStoryPoints?: number }) =>
     runAction(async () => {
       await createSprint({
         variables: {
@@ -225,6 +225,7 @@ export const App: React.FC = () => {
             goal: input.goal,
             startDate: new Date(`${input.startDate}T00:00:00`).toISOString(),
             endDate: new Date(`${input.endDate}T23:59:59`).toISOString(),
+            capacityStoryPoints: input.capacityStoryPoints || 0,
           },
         },
       });
@@ -406,6 +407,7 @@ export const App: React.FC = () => {
               <TimelinePage
                 sprints={sprints}
                 loading={sprintsQuery.loading && !sprintsQuery.data}
+                canManageSprints={canManageWorkspace}
                 onCreateSprint={handleCreateSprint}
                 onStartSprint={handleStartSprint}
                 onCompleteSprint={handleCompleteSprint}

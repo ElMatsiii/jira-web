@@ -80,7 +80,7 @@ export const GET_ISSUE_WORK_LOGS = gql`
 export const GET_SPRINTS = gql`
   query GetSprints($projectId: String!) {
     listSprints(projectId: $projectId) {
-      id name goal status startDate endDate totalStoryPoints completedStoryPoints
+      id name goal status startDate endDate totalStoryPoints completedStoryPoints capacityStoryPoints
     }
   }
 `;
@@ -183,6 +183,7 @@ export const CREATE_SPRINT = gql`
       name
       goal
       status
+      capacityStoryPoints
     }
   }
 `;

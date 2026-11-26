@@ -1444,6 +1444,27 @@ select {
   color: var(--text-muted);
 }
 
+.timeline-permission-notice {
+  padding: 10px 14px;
+  background-color: var(--bg-surface-elevated, #f8f9fa);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.sprint-capacity-warning {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-sm);
+  color: #dc2626;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 /* Sprint status chip and timeline dot: status-planned | status-active | status-completed | status-cancelled */
 .sprint-status {
   display: inline-block;
