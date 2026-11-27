@@ -258,7 +258,7 @@ export const BacklogPage: React.FC<BacklogPageProps> = ({
                       // Choosing a sprint must not open the issue detail.
                       onClick={(event) => event.stopPropagation()}
                       onChange={(event) => {
-                        if (event.target.value) onAssignIssue(issue.id, event.target.value);
+                        onAssignIssue(issue.id, event.target.value);
                       }}
                     >
                       <option value="">Backlog</option>

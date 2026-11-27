@@ -210,7 +210,7 @@ export const App: React.FC = () => {
   });
 
   const handleAssignIssue = (id: string, sprintId: string) => runBannerAction(async () => {
-    await assignIssuesToSprint({ variables: { input: { issueIds: [id], sprintId } } });
+    await assignIssuesToSprint({ variables: { input: { issueIds: [id], sprintId: sprintId || '' } } });
     await issuesQuery.refetch();
     await sprintsQuery.refetch();
   });
